@@ -1,0 +1,20 @@
+﻿@page "/Account/Logout"
+@using Microsoft.AspNetCore.Identity
+@using EventHub.Data.Models
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Выход | EventHub</PageTitle>
+
+<div class="container py-5">
+    <p>Выход из системы...</p>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await SignInManager.SignOutAsync();
+        NavigationManager.NavigateTo("/", true);
+    }
+}

@@ -1,0 +1,87 @@
+﻿@namespace EventHub.Components.Pages.Profile
+@using EventHub.Data
+@using EventHub.Data.Models
+@using System.ComponentModel.DataAnnotations
+
+@if (IsVisible)
+{
+    <div class="modal">
+        <div class="modal-content">
+            <h2>Редактировать профиль</h2>
+
+            <EditForm Model="editModel" OnValidSubmit="SaveProfile">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>Имя</label>
+                    <InputText @bind-Value="editModel.FirstName" class="input-field" />
+                    <ValidationMessage For="@(() => editModel.FirstName)" />
+                </div>
+
+                <div class="form-group">
+                    <label>Фамилия</label>
+                    <InputText @bind-Value="editModel.LastName" class="input-field" />
+                    <ValidationMessage For="@(() => editModel.LastName)" />
+                </div>
+
+                <div class="form-group">
+                    <label>Дата рождения</label>
+                    <InputDate @bind-Value="editModel.DateOfBirth" class="input-field" />
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" @onclick="OnClose">Отмена</button>
+                    <button type="submit" class="btn-primary">Сохранить</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public ApplicationUser? User { get; set; }
+    [Parameter] public EventCallback<ApplicationUser> OnSave { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private EditModel editModel = new();
+
+    protected override void OnParametersSet()
+    {
+        if (User is null)
+            return;
+
+        editModel = new EditModel
+        {
+            FirstName = User.FirstName,
+            LastName = User.LastName,
+            DateOfBirth = User.DateOfBirth
+        };
+    }
+
+    private async Task SaveProfile()
+    {
+        if (User is null)
+            return;
+
+        User.FirstName = editModel.FirstName?.Trim();
+        User.LastName = editModel.LastName?.Trim();
+        User.DateOfBirth = editModel.DateOfBirth;
+
+        await OnSave.InvokeAsync(User);
+    }
+
+    private class EditModel
+    {
+        [Required(ErrorMessage = "Введите имя")]
+        [StringLength(100)]
+        public string? FirstName { get; set; }
+
+        [Required(ErrorMessage = "Введите фамилию")]
+        [StringLength(100)]
+        public string? LastName { get; set; }
+
+        public DateTime? DateOfBirth { get; set; }
+    }
+}

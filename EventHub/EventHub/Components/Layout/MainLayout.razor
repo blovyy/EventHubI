@@ -1,0 +1,15 @@
+﻿@inherits LayoutComponentBase
+
+<div class="layout">
+    <NavMenu />
+
+    <main>
+        @Body
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; @DateTime.Now.Year - EventHub. Все права защищены.</p>
+        </div>
+    </footer>
+</div>

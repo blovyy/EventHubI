@@ -1,0 +1,67 @@
+﻿@namespace EventHub.Components.Pages.Profile
+@using EventHub.Data.Models
+
+@if (Events != null && Events.Any())
+{
+    <div class="events-list">
+        @foreach (var ev in Events)
+        {
+            <div class="event-item">
+                <div class="event-info" @onclick="() => OnView.InvokeAsync(ev.Id)">
+                    <h3>@ev.Title</h3>
+                    <p>@ev.StartDate.ToString("dd.MM.yyyy HH:mm") • @ev.Location</p>
+                    <span class="event-status status-@ev.Status.ToString().ToLower()">
+                        @GetStatusText(ev.Status)
+                    </span>
+                    <span class="moderation-status moderation-@ev.ModerationStatus.ToString().ToLower()">
+                        @GetModerationText(ev.ModerationStatus)
+                    </span>
+                </div>
+
+                <div class="event-actions">
+                    <button class="btn-icon" @onclick="() => OnEdit.InvokeAsync(ev.Id)" title="Редактировать">✏️</button>
+                    <button class="btn-icon" @onclick="() => OnDelete.InvokeAsync(ev.Id)" title="Удалить">🗑️</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="empty-state">
+        <p>У вас пока нет созданных мероприятий</p>
+        @if (IsProfileComplete)
+        {
+            <a href="/create" class="btn-primary">Создать мероприятие</a>
+        }
+        else
+        {
+            <p class="hint">Заполните профиль, чтобы создавать мероприятия</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public List<Event>? Events { get; set; }
+    [Parameter] public bool IsProfileComplete { get; set; }
+    [Parameter] public EventCallback<int> OnEdit { get; set; }
+    [Parameter] public EventCallback<int> OnDelete { get; set; }
+    [Parameter] public EventCallback<int> OnView { get; set; }
+
+    private string GetStatusText(EventStatus status) => status switch
+    {
+        EventStatus.Draft => "Черновик",
+        EventStatus.Published => "Опубликовано",
+        EventStatus.Cancelled => "Отменено",
+        EventStatus.Completed => "Завершено",
+        _ => status.ToString()
+    };
+
+    private string GetModerationText(EventModerationStatus status) => status switch
+    {
+        EventModerationStatus.Pending => "На модерации",
+        EventModerationStatus.Approved => "Одобрено",
+        EventModerationStatus.Rejected => "Отклонено",
+        _ => status.ToString()
+    };
+}

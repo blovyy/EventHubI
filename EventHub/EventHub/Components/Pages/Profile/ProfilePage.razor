@@ -1,0 +1,691 @@
+﻿@page "/profile"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using EventHub.Data
+@using EventHub.Data.Models
+@using EventHub.Services.Interfaces
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IEventService EventService
+@inject IParticipantService ParticipantService
+@inject IReviewService ReviewService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+
+<PageTitle>Профиль - EventHub</PageTitle>
+
+<div class="profile-container profile-shell">
+    @if (_isLoading)
+    {
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Загрузка профиля...</p>
+        </div>
+    }
+    else if (_user == null)
+    {
+        <div class="empty-state">
+            <p>Ошибка загрузки профиля</p>
+            <button class="btn btn-primary" @onclick="RefreshPage">Обновить</button>
+        </div>
+    }
+    else
+    {
+        <section class="profile-hero">
+            <div class="profile-hero-copy">
+                <span class="section-badge">Личный кабинет</span>
+                <h1 class="profile-title">Профиль</h1>
+                <p class="page-description">
+                    Вся личная информация, созданные события, участия и отзывы собраны в одном спокойном пространстве.
+                </p>
+            </div>
+
+            <div class="profile-hero-stats">
+                <div class="profile-hero-stat">
+                    <span class="profile-hero-value">@((createdEvents?.Count) ?? 0)</span>
+                    <span class="profile-hero-label">созданных мероприятий</span>
+                </div>
+                <div class="profile-hero-stat">
+                    <span class="profile-hero-value">@((participatedEvents?.Count) ?? 0)</span>
+                    <span class="profile-hero-label">участий</span>
+                </div>
+                <div class="profile-hero-stat">
+                    <span class="profile-hero-value">@((myReviews?.Count) ?? 0)</span>
+                    <span class="profile-hero-label">отзывов</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="profile-overview">
+            <div class="profile-info-card">
+                <div class="profile-card-top">
+                    <div>
+                        <span class="section-badge">Личная информация</span>
+                        <h2>Ваши данные</h2>
+                    </div>
+
+                    <button class="btn btn-primary btn-large profile-edit-button" @onclick="OpenEditProfileModal">
+                        Редактировать профиль
+                    </button>
+                </div>
+
+                <div class="profile-identity">
+                    <div class="profile-avatar-large">
+                        @GetUserInitials()
+                    </div>
+
+                    <div class="profile-identity-copy">
+                        <h3>@GetDisplayName()</h3>
+                        <p>@_user.Email</p>
+                    </div>
+                </div>
+
+                <div class="profile-info-grid">
+                    <div class="profile-info-item">
+                        <span class="profile-info-label">Имя</span>
+                        <strong class="profile-info-value">
+                            @if (!string.IsNullOrWhiteSpace(_user.FirstName))
+                            {
+                                @_user.FirstName
+                            }
+                            else
+                            {
+                                <span class="not-specified">Не указано</span>
+                            }
+                        </strong>
+                    </div>
+
+                    <div class="profile-info-item">
+                        <span class="profile-info-label">Фамилия</span>
+                        <strong class="profile-info-value">
+                            @if (!string.IsNullOrWhiteSpace(_user.LastName))
+                            {
+                                @_user.LastName
+                            }
+                            else
+                            {
+                                <span class="not-specified">Не указано</span>
+                            }
+                        </strong>
+                    </div>
+
+                    <div class="profile-info-item profile-info-item-wide">
+                        <span class="profile-info-label">Email</span>
+                        <strong class="profile-info-value">@_user.Email</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-grid profile-stats-grid">
+                <div class="stat-card clickable" @onclick="() => SetTab(ProfileTab.Created)">
+                    <div class="stat-value">@((createdEvents?.Count) ?? 0)</div>
+                    <div class="stat-label">Мои мероприятия</div>
+                </div>
+
+                <div class="stat-card clickable" @onclick="() => SetTab(ProfileTab.Participated)">
+                    <div class="stat-value">@((participatedEvents?.Count) ?? 0)</div>
+                    <div class="stat-label">Посещённые</div>
+                </div>
+
+                <div class="stat-card clickable" @onclick="() => SetTab(ProfileTab.Reviews)">
+                    <div class="stat-value">@((myReviews?.Count) ?? 0)</div>
+                    <div class="stat-label">Отзывы</div>
+                </div>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(infoMessage))
+        {
+            <div class="admin-message">@infoMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="error-message-box">@errorMessage</div>
+        }
+
+        <div class="profile-tabs">
+            <button class="tab-button @(activeTab == ProfileTab.Created ? "active" : "")"
+                    @onclick="() => SetTab(ProfileTab.Created)">
+                Мои мероприятия
+            </button>
+
+            <button class="tab-button @(activeTab == ProfileTab.Participated ? "active" : "")"
+                    @onclick="() => SetTab(ProfileTab.Participated)">
+                Посещённые
+            </button>
+
+            <button class="tab-button @(activeTab == ProfileTab.Reviews ? "active" : "")"
+                    @onclick="() => SetTab(ProfileTab.Reviews)">
+                Отзывы
+            </button>
+        </div>
+
+        <div class="events-table-container profile-table-shell">
+            @if (activeTab == ProfileTab.Created)
+            {
+                @if (createdEvents != null && createdEvents.Any())
+                {
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Дата</th>
+                                <th>Статус</th>
+                                <th>Модерация</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ev in createdEvents)
+                            {
+                                <tr>
+                                    <td data-label="Название">@ev.Title</td>
+                                    <td data-label="Дата">@ev.StartDate.ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td data-label="Статус">
+                                        <span class="status-badge @GetEventBadgeClass(ev.Status)">
+                                            @GetStatusText(ev.Status)
+                                        </span>
+                                    </td>
+                                    <td data-label="Модерация">
+                                        <span class="status-badge @GetModerationBadgeClass(ev.ModerationStatus)">
+                                            @GetModerationText(ev.ModerationStatus)
+                                        </span>
+                                    </td>
+                                    <td data-label="Действия" class="actions-cell">
+                                        <div class="actions-stack">
+                                            <button class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
+                                            <button class="action-link-button" @onclick="() => EditEvent(ev.Id)">Редактировать</button>
+                                            <button class="action-delete" @onclick="() => DeleteEvent(ev.Id)">Удалить</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <p>У вас пока нет созданных мероприятий</p>
+                        <NavLink href="/create" class="btn btn-primary">Создать</NavLink>
+                    </div>
+                }
+            }
+            else if (activeTab == ProfileTab.Participated)
+            {
+                @if (participatedEvents != null && participatedEvents.Any())
+                {
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Дата</th>
+                                <th>Место</th>
+                                <th>Отзыв</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ev in participatedEvents)
+                            {
+                                var existingReview = myReviews?.FirstOrDefault(r => r.EventId == ev.Id);
+                                var canReview = existingReview == null && ev.EndDate <= DateTime.Now;
+
+                                <tr>
+                                    <td data-label="Название">@ev.Title</td>
+                                    <td data-label="Дата">@ev.StartDate.ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td data-label="Место">@ev.Location</td>
+                                    <td data-label="Отзыв">
+                                        @if (existingReview != null)
+                                        {
+                                            <span class="status-badge @GetReviewBadgeClass(existingReview.ModerationStatus)">
+                                                @GetReviewModerationText(existingReview.ModerationStatus)
+                                            </span>
+                                        }
+                                        else if (ev.EndDate > DateTime.Now)
+                                        {
+                                            <span class="status-badge status-draft">После завершения</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="status-badge status-approved">Можно оставить</span>
+                                        }
+                                    </td>
+                                    <td data-label="Действия" class="actions-cell">
+                                        <div class="actions-stack">
+                                            <button class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
+
+                                            @if (canReview)
+                                            {
+                                                <button class="action-link-button feedback"
+                                                        @onclick="() => OpenReviewModal(ev.Id, ev.Title)">
+                                                    Оставить отзыв
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <p>Нет посещённых мероприятий</p>
+                    </div>
+                }
+            }
+            else
+            {
+                @if (myReviews != null && myReviews.Any())
+                {
+                    <table class="events-table">
+                        <thead>
+                            <tr>
+                                <th>Мероприятие</th>
+                                <th>Оценка</th>
+                                <th>Текст</th>
+                                <th>Статус</th>
+                                <th>Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in myReviews)
+                            {
+                                <tr>
+                                    <td data-label="Мероприятие">@r.Event?.Title</td>
+                                    <td data-label="Оценка">⭐ @r.Rating / 5</td>
+                                    <td data-label="Текст">@r.Text</td>
+                                    <td data-label="Статус">
+                                        <span class="status-badge @GetReviewBadgeClass(r.ModerationStatus)">
+                                            @GetReviewModerationText(r.ModerationStatus)
+                                        </span>
+                                    </td>
+                                    <td data-label="Дата">@r.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="empty-state">
+                        <p>Вы ещё не оставляли отзывы</p>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@if (isEditProfileModalVisible)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <h2>Редактировать профиль</h2>
+
+            <EditForm Model="profileEditModel" OnValidSubmit="SaveProfile" FormName="editProfileForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="edit-form">
+                    <div class="form-group">
+                        <label>Имя</label>
+                        <InputText @bind-Value="profileEditModel.FirstName" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Фамилия</label>
+                        <InputText @bind-Value="profileEditModel.LastName" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseEditProfileModal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (isReviewModalVisible)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <h2>Оставить отзыв</h2>
+
+            <p class="modal-subtitle">
+                Мероприятие: <strong>@selectedEventTitle</strong>
+            </p>
+
+            <EditForm Model="reviewModel" OnValidSubmit="SubmitReview" FormName="reviewForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="edit-form">
+                    <div class="form-group">
+                        <label>Оценка</label>
+                        <InputNumber @bind-Value="reviewModel.Rating" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Текст отзыва</label>
+                        <InputTextArea @bind-Value="reviewModel.Text" class="form-control" rows="5" />
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseReviewModal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Отправить</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private ApplicationUser? _user;
+    private List<Event>? createdEvents;
+    private List<Event>? participatedEvents;
+    private List<Review>? myReviews;
+
+    private bool _isLoading = true;
+    private string? currentUserId;
+    private string? infoMessage;
+    private string? errorMessage;
+
+    private bool isEditProfileModalVisible;
+    private bool isReviewModalVisible;
+    private int selectedEventId;
+    private string selectedEventTitle = string.Empty;
+
+    private ProfileEditModel profileEditModel = new();
+    private ReviewCreateModel reviewModel = new();
+
+    private enum ProfileTab
+    {
+        Created,
+        Participated,
+        Reviews
+    }
+
+    private ProfileTab activeTab = ProfileTab.Created;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        errorMessage = null;
+        infoMessage = null;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(currentUserId))
+                return;
+
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            _user = await context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+            if (_user == null)
+                return;
+
+            createdEvents = await EventService.GetEventsByOrganizerAsync(currentUserId);
+
+            var participations = await ParticipantService.GetParticipationsByUserAsync(currentUserId);
+            participatedEvents = participations
+                .Where(x => x.Event != null)
+                .Select(x => x.Event!)
+                .DistinctBy(x => x.Id)
+                .OrderByDescending(x => x.StartDate)
+                .ToList();
+
+            myReviews = await ReviewService.GetReviewsByUserAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка загрузки профиля: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SetTab(ProfileTab tab) => activeTab = tab;
+
+    private void GoToEvent(int id) => NavigationManager.NavigateTo($"/event/{id}");
+
+    private void EditEvent(int id) => NavigationManager.NavigateTo($"/edit/{id}");
+
+    private async Task DeleteEvent(int id)
+    {
+        errorMessage = null;
+        infoMessage = null;
+
+        if (await EventService.DeleteEventAsync(id))
+        {
+            infoMessage = "Мероприятие удалено.";
+            await LoadData();
+        }
+        else
+        {
+            errorMessage = "Не удалось удалить мероприятие.";
+        }
+    }
+
+    private void RefreshPage()
+    {
+        NavigationManager.NavigateTo("/profile", true);
+    }
+
+    private void OpenEditProfileModal()
+    {
+        if (_user == null)
+            return;
+
+        profileEditModel = new ProfileEditModel
+        {
+            FirstName = _user.FirstName ?? string.Empty,
+            LastName = _user.LastName ?? string.Empty
+        };
+
+        isEditProfileModalVisible = true;
+    }
+
+    private void CloseEditProfileModal() => isEditProfileModalVisible = false;
+
+    private async Task SaveProfile()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+            return;
+
+        errorMessage = null;
+        infoMessage = null;
+
+        var userToUpdate = await UserManager.FindByIdAsync(currentUserId);
+        if (userToUpdate == null)
+        {
+            errorMessage = "Пользователь не найден.";
+            return;
+        }
+
+        userToUpdate.FirstName = profileEditModel.FirstName.Trim();
+        userToUpdate.LastName = profileEditModel.LastName.Trim();
+
+        var result = await UserManager.UpdateAsync(userToUpdate);
+
+        if (result.Succeeded)
+        {
+            infoMessage = "Профиль успешно обновлён.";
+            isEditProfileModalVisible = false;
+            await LoadData();
+        }
+        else
+        {
+            errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    private void OpenReviewModal(int eventId, string eventTitle)
+    {
+        selectedEventId = eventId;
+        selectedEventTitle = eventTitle;
+        reviewModel = new ReviewCreateModel();
+        isReviewModalVisible = true;
+    }
+
+    private void CloseReviewModal()
+    {
+        isReviewModalVisible = false;
+        selectedEventId = 0;
+        selectedEventTitle = string.Empty;
+        reviewModel = new ReviewCreateModel();
+    }
+
+    private async Task SubmitReview()
+    {
+        errorMessage = null;
+        infoMessage = null;
+
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            errorMessage = "Не удалось определить пользователя.";
+            return;
+        }
+
+        var success = await ReviewService.CreateReviewAsync(new Review
+        {
+            EventId = selectedEventId,
+            UserId = currentUserId,
+            Rating = reviewModel.Rating,
+            Text = reviewModel.Text.Trim()
+        });
+
+        if (!success)
+        {
+            errorMessage = "Не удалось отправить отзыв. Его можно оставить только после завершения мероприятия и только один раз.";
+            return;
+        }
+
+        infoMessage = "Отзыв отправлен на модерацию.";
+        CloseReviewModal();
+        activeTab = ProfileTab.Reviews;
+        await LoadData();
+    }
+
+    private string GetStatusText(EventStatus status) => status switch
+    {
+        EventStatus.Draft => "Черновик",
+        EventStatus.Published => "Опубликовано",
+        EventStatus.Cancelled => "Отменено",
+        EventStatus.Completed => "Завершено",
+        _ => status.ToString()
+    };
+
+    private string GetModerationText(EventModerationStatus status) => status switch
+    {
+        EventModerationStatus.Pending => "На модерации",
+        EventModerationStatus.Approved => "Одобрено",
+        EventModerationStatus.Rejected => "Отклонено",
+        _ => status.ToString()
+    };
+
+    private string GetReviewModerationText(ReviewModerationStatus status) => status switch
+    {
+        ReviewModerationStatus.Pending => "На модерации",
+        ReviewModerationStatus.Approved => "Одобрен",
+        ReviewModerationStatus.Rejected => "Отклонён",
+        _ => status.ToString()
+    };
+
+    private string GetEventBadgeClass(EventStatus status) => status switch
+    {
+        EventStatus.Draft => "status-draft",
+        EventStatus.Published => "status-published",
+        EventStatus.Cancelled => "status-cancelled",
+        EventStatus.Completed => "status-completed",
+        _ => "status-draft"
+    };
+
+    private string GetModerationBadgeClass(EventModerationStatus status) => status switch
+    {
+        EventModerationStatus.Pending => "status-pending",
+        EventModerationStatus.Approved => "status-approved",
+        EventModerationStatus.Rejected => "status-rejected",
+        _ => "status-draft"
+    };
+
+    private string GetReviewBadgeClass(ReviewModerationStatus status) => status switch
+    {
+        ReviewModerationStatus.Pending => "status-pending",
+        ReviewModerationStatus.Approved => "status-approved",
+        ReviewModerationStatus.Rejected => "status-rejected",
+        _ => "status-pending"
+    };
+
+    private string GetDisplayName()
+    {
+        var parts = new[] { _user?.FirstName, _user?.LastName }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim())
+            .ToArray();
+
+        return parts.Length > 0 ? string.Join(" ", parts) : "Пользователь EventHub";
+    }
+
+    private string GetUserInitials()
+    {
+        var parts = new[] { _user?.FirstName, _user?.LastName }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim()[0].ToString().ToUpperInvariant())
+            .ToArray();
+
+        if (parts.Length >= 2)
+            return string.Concat(parts[0], parts[1]);
+
+        if (parts.Length == 1)
+            return parts[0];
+
+        return "EH";
+    }
+
+    private class ProfileEditModel
+    {
+        [Required(ErrorMessage = "Введите имя")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Введите фамилию")]
+        public string LastName { get; set; } = string.Empty;
+    }
+
+    private class ReviewCreateModel
+    {
+        [Range(1, 5, ErrorMessage = "Оценка должна быть от 1 до 5")]
+        public int Rating { get; set; } = 5;
+
+        [Required(ErrorMessage = "Введите текст отзыва")]
+        [StringLength(1000, MinimumLength = 5, ErrorMessage = "Текст должен содержать от 5 до 1000 символов")]
+        public string Text { get; set; } = string.Empty;
+    }
+}

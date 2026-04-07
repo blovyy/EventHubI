@@ -1,0 +1,54 @@
+﻿@namespace EventHub.Components.Pages.Profile
+@using EventHub.Data
+
+<div class="profile-sidebar">
+    <div class="profile-card">
+        <div class="profile-avatar">
+            @GetInitials()
+        </div>
+        <h2 class="profile-name">@User?.UserName</h2>
+        <p class="profile-email">@User?.Email</p>
+
+        @if (!IsProfileComplete)
+        {
+            <div class="profile-alert">
+                ⚠️ Заполните профиль, чтобы создавать мероприятия
+            </div>
+        }
+
+        <button class="btn-edit-profile" @onclick="OnEditProfile">
+            ✏️ Редактировать профиль
+        </button>
+    </div>
+
+    <div class="stats-card">
+        <h3>Статистика</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-value">@CreatedCount</span>
+                <span class="stat-label">Создано</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">@RegisteredCount</span>
+                <span class="stat-label">Участвую</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public ApplicationUser? User { get; set; }
+    [Parameter] public bool IsProfileComplete { get; set; }
+    [Parameter] public int CreatedCount { get; set; }
+    [Parameter] public int RegisteredCount { get; set; }
+    [Parameter] public EventCallback OnEditProfile { get; set; }
+
+    private string GetInitials()
+    {
+        if (!string.IsNullOrEmpty(User?.FirstName) && !string.IsNullOrEmpty(User?.LastName))
+        {
+            return $"{User.FirstName[0]}{User.LastName[0]}";
+        }
+        return "👤";
+    }
+}

@@ -1,0 +1,23 @@
+﻿@using EventHub.Data.Models  // 👈 ВАЖНО!
+
+@if (Events != null && Events.Any())
+{
+    <div class="events-list">
+        @foreach (var ev in Events)
+        {
+            <div class="event-item" @onclick="() => OnView.InvokeAsync(ev.Id)">
+                <h3>@ev.Title</h3>
+                <p>@ev.StartDate.ToString("dd.MM.yyyy HH:mm") • @ev.Location</p>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <p>Нет участия</p>
+}
+
+@code {
+    [Parameter] public List<Event>? Events { get; set; }
+    [Parameter] public EventCallback<int> OnView { get; set; }
+}

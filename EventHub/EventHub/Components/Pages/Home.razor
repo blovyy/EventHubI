@@ -1,0 +1,228 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@implements IDisposable
+<PageTitle>Главная - EventHub</PageTitle>
+
+<section class="hero">
+    <div class="container">
+        <div class="hero-grid">
+            <div class="hero-content">
+                <span class="eyebrow animate-fade-in">Образовательные мероприятия</span>
+                <h1 class="animate-fade-in">
+                    Платформа для регистрации
+                    <span class="gradient-text">на образовательные мероприятия</span>
+                </h1>
+
+                <p class="hero-subtitle animate-fade-in-delay">
+                    EventHub помогает образовательным учреждениям публиковать мероприятия,
+                    открывать регистрацию для участников и вести работу с заявками в едином кабинете.
+                </p>
+
+                <div class="hero-buttons animate-fade-in-delay-3">
+                    <a href="/create" class="btn btn-primary btn-large">
+                        <span class="button-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                            </svg>
+                        </span>
+                        <span>Создать мероприятие</span>
+                    </a>
+                    <a href="/events" class="btn btn-outline btn-large">
+                        <span class="button-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 4h6l1 2h3v14H5V6h3z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8" />
+                                <path d="M8 11h8M8 15h8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                            </svg>
+                        </span>
+                        <span>Посмотреть все</span>
+                    </a>
+                </div>
+
+                <div class="hero-metrics animate-fade-in-delay-3">
+                    <div class="metric">
+                        <span class="metric-value">Обучение</span>
+                        <span class="metric-label">лекции, семинары, конференции, мастер-классы</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-value">Регистрация</span>
+                        <span class="metric-label">запись участников и управление списками посещения</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slider-card animate-fade-in-delay-2">
+                <div class="slider-wrapper">
+                    <img src="@slides[currentSlide].ImageUrl"
+                         alt="@slides[currentSlide].Title"
+                         class="slider-image" />
+
+                    <div class="slider-overlay">
+                        <div class="slider-caption">
+                            <h3>@slides[currentSlide].Title</h3>
+                            <p>@slides[currentSlide].Description</p>
+                        </div>
+                    </div>
+
+                    <button class="slider-nav prev" @onclick="PrevSlide" aria-label="Предыдущий слайд">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+                        </svg>
+                    </button>
+                    <button class="slider-nav next" @onclick="NextSlide" aria-label="Следующий слайд">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="slider-dots">
+                    @for (int i = 0; i < slides.Count; i++)
+                    {
+                        var index = i;
+                        <button class="dot @(currentSlide == i ? "active" : "")"
+                                @onclick="() => GoToSlide(index)"></button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="home-summary">
+    <div class="container">
+        <div class="home-summary-head">
+            <span class="section-badge">Основные возможности</span>
+            <h2>Всё необходимое для образовательных мероприятий</h2>
+            <p class="section-description">
+                Публикуйте события, открывайте регистрацию и работайте с участниками в одном пространстве.
+            </p>
+        </div>
+
+        <div class="home-summary-grid">
+            <article class="summary-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m3 9 9-4 9 4-9 4Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8" />
+                        <path d="M7 10.8v4.2c0 1.7 2.2 3 5 3s5-1.3 5-3v-4.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                    </svg>
+                </div>
+                <h3>Размещать мероприятия</h3>
+                <p>Публикуйте лекции, семинары, вебинары, олимпиады, конференции и мастер-классы.</p>
+            </article>
+
+            <article class="summary-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 12a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm6 1.5a2.5 2.5 0 1 0-2.5-2.5 2.5 2.5 0 0 0 2.5 2.5ZM4 19a5 5 0 0 1 10 0M13 19a4 4 0 0 1 7 0" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                    </svg>
+                </div>
+                <h3>Вести регистрацию</h3>
+                <p>Контролируйте заявки, списки участников и посещение образовательных мероприятий.</p>
+            </article>
+
+            <article class="summary-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 17.5 3.5 20V6.5A2.5 2.5 0 0 1 6 4h12A2.5 2.5 0 0 1 20.5 6.5v8A2.5 2.5 0 0 1 18 17H6Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8" />
+                        <path d="M8 9.5h8M8 13h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                    </svg>
+                </div>
+                <h3>Собирать отзывы</h3>
+                <p>После завершения мероприятия участники могут оставить отзыв, который проходит модерацию.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="cta">
+    <div class="container">
+        <h2>Готовы открыть регистрацию на мероприятие?</h2>
+        <p class="cta-text">
+            Создайте образовательное событие или перейдите в каталог мероприятий и посмотрите доступные программы.
+        </p>
+        <div class="cta-buttons">
+            <a href="/create" class="btn btn-primary btn-large">
+                <span class="button-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                    </svg>
+                </span>
+                <span>Создать мероприятие</span>
+            </a>
+            <a href="/Account/Register" class="btn btn-outline btn-large">
+                <span class="button-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 19.5h12M7 16.5l8.8-8.8a1.8 1.8 0 0 0-2.5-2.5L4.5 14v2.5Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8" />
+                    </svg>
+                </span>
+                <span>Зарегистрироваться</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+@code {
+    private int currentSlide = 0;
+    private System.Threading.Timer? timer;
+
+    private List<SlideItem> slides = new()
+    {
+        new SlideItem
+        {
+            Title = "Лекции и образовательные встречи",
+            Description = "Создавайте современные учебные события для студентов и слушателей",
+            ImageUrl = "/images/slider/slide-1.jpg"
+        },
+        new SlideItem
+        {
+            Title = "Семинары и мастер-классы",
+            Description = "Показывайте расписание, собирайте участников и получайте отзывы",
+            ImageUrl = "/images/slider/slide-2.jpg"
+        },
+        new SlideItem
+        {
+            Title = "Конференции и вебинары",
+            Description = "Организуйте как очные, так и онлайн-мероприятия в одном сервисе",
+            ImageUrl = "/images/slider/slide-3.jpg"
+        }
+    };
+
+    protected override void OnInitialized()
+    {
+        timer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                currentSlide = (currentSlide + 1) % slides.Count;
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(4));
+    }
+
+    private void NextSlide()
+    {
+        currentSlide = (currentSlide + 1) % slides.Count;
+    }
+
+    private void PrevSlide()
+    {
+        currentSlide = (currentSlide - 1 + slides.Count) % slides.Count;
+    }
+
+    private void GoToSlide(int index)
+    {
+        currentSlide = index;
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+
+    private class SlideItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+    }
+}

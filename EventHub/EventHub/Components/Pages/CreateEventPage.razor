@@ -1,0 +1,213 @@
+﻿@page "/create"
+@rendermode InteractiveServer
+@using EventHub.Data
+@using Microsoft.EntityFrameworkCore
+@using EventHub.Data.Models
+@using Microsoft.AspNetCore.Authorization
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="create-event-container">
+    <div class="page-header">
+        <h1>Создать мероприятие</h1>
+        <p class="page-description">Заполни карточку события, и оно отправится на модерацию.</p>
+    </div>
+
+    <div class="form-card">
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="success-message">
+                @successMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(infoMessage))
+        {
+            <div class="info-message">
+                @infoMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="error-message">
+                @errorMessage
+            </div>
+        }
+
+        @if (!isEventCreated)
+        {
+            <EditForm Model="model" OnValidSubmit="CreateNewEvent" FormName="createEventForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>Название мероприятия</label>
+                    <InputText @bind-Value="model.Title" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>Описание</label>
+                    <InputTextArea @bind-Value="model.Description" class="form-control" rows="4" />
+                </div>
+
+                <div class="form-group">
+                    <label>Тип мероприятия</label>
+                    <InputSelect @bind-Value="model.EventType" class="form-control">
+                        @foreach (var type in Enum.GetValues<EventType>())
+                        {
+                            <option value="@type">@GetEventTypeLabel(type)</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-group">
+                    <label>Дата начала</label>
+                    <InputDate @bind-Value="model.StartDate" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>Место</label>
+                    <InputText @bind-Value="model.Location" class="form-control" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Макс. участников</label>
+                        <InputNumber @bind-Value="model.MaxParticipants" class="form-control" />
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-create" disabled="@isSubmitting">
+                    @(isSubmitting ? "Создание..." : "Создать мероприятие")
+                </button>
+            </EditForm>
+        }
+        else
+        {
+            <div class="text-center">
+                <NavLink href="/profile" class="btn-create">
+                    Перейти в профиль
+                </NavLink>
+            </div>
+        }
+
+        <NavLink href="/events" class="back-link">
+            ← Вернуться к списку мероприятий
+        </NavLink>
+    </div>
+</div>
+
+@code {
+    private CreateEventModel model = new()
+    {
+        StartDate = DateTime.Now.AddDays(7),
+        MaxParticipants = 50,
+        EventType = EventType.Other
+    };
+
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string infoMessage = string.Empty;
+
+    private bool isSubmitting = false;
+    private bool isEventCreated = false;
+
+    private async Task CreateNewEvent()
+    {
+        try
+        {
+            isSubmitting = true;
+            errorMessage = string.Empty;
+            successMessage = string.Empty;
+            infoMessage = string.Empty;
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                errorMessage = "Не удалось определить пользователя";
+                return;
+            }
+
+            if (model.StartDate <= DateTime.Now)
+            {
+                errorMessage = "Дата должна быть в будущем";
+                return;
+            }
+
+            var newEvent = new Event
+            {
+                Title = model.Title.Trim(),
+                Description = model.Description.Trim(),
+                EventType = model.EventType,
+                StartDate = model.StartDate,
+                EndDate = model.StartDate.AddHours(2),
+                Location = model.Location.Trim(),
+                MaxParticipants = model.MaxParticipants,
+                Price = 0,
+                OrganizerId = userId,
+                CreatedAt = DateTime.UtcNow,
+                Status = EventStatus.Draft,
+                ModerationStatus = EventModerationStatus.Pending
+            };
+
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            context.Events.Add(newEvent);
+            await context.SaveChangesAsync();
+
+            successMessage = $"Мероприятие \"{newEvent.Title}\" создано";
+            infoMessage = "Отправлено на модерацию";
+            isEventCreated = true;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static string GetEventTypeLabel(EventType type) => type switch
+    {
+        EventType.Lecture => "Лекция",
+        EventType.Seminar => "Семинар",
+        EventType.Workshop => "Мастер-класс",
+        EventType.Conference => "Конференция",
+        EventType.Training => "Тренинг",
+        EventType.Webinar => "Вебинар",
+        EventType.Meeting => "Встреча",
+        _ => "Другое"
+    };
+
+    private class CreateEventModel
+    {
+        [Required(ErrorMessage = "Введите название")]
+        public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Введите описание")]
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Укажите дату")]
+        public DateTime StartDate { get; set; }
+
+        [Required(ErrorMessage = "Введите место")]
+        public string Location { get; set; } = string.Empty;
+
+        [Range(1, 100000)]
+        public int MaxParticipants { get; set; }
+
+        [Required]
+        public EventType EventType { get; set; } = EventType.Other;
+    }
+}

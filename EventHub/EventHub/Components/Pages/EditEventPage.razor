@@ -1,0 +1,270 @@
+﻿@page "/edit/{id:int}"
+@rendermode InteractiveServer
+@using EventHub.Data.Models
+@using EventHub.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize]
+
+@inject IEventService EventService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Редактирование мероприятия - EventHub</PageTitle>
+
+<div class="edit-container">
+    <div class="edit-card">
+        <div class="page-header">
+            <h1>Редактирование мероприятия</h1>
+            <p class="page-description">Обнови ключевые данные и отправь событие на повторную модерацию.</p>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="error-message">@errorMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="success-message">@successMessage</div>
+        }
+
+        @if (isLoading)
+        {
+            <div class="loading-spinner">
+                <p>Загрузка мероприятия...</p>
+            </div>
+        }
+        else if (!isAuthorized)
+        {
+            <div class="error-message">
+                У вас нет прав для редактирования этого мероприятия.
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" @onclick="GoBack">Назад</button>
+            </div>
+        }
+        else
+        {
+            <EditForm Model="model" OnValidSubmit="SaveEvent">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>Название</label>
+                    <InputText @bind-Value="model.Title" class="form-control" />
+                    <ValidationMessage For="@(() => model.Title)" />
+                </div>
+
+                <div class="form-group">
+                    <label>Описание</label>
+                    <InputTextArea @bind-Value="model.Description" class="form-control" rows="5" />
+                    <ValidationMessage For="@(() => model.Description)" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Дата</label>
+                        <InputDate @bind-Value="model.EventDate" class="form-control" />
+                        <ValidationMessage For="@(() => model.EventDate)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Время</label>
+                        <InputText @bind-Value="model.EventTime" class="form-control" placeholder="Например: 14:30" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Место</label>
+                    <InputText @bind-Value="model.Location" class="form-control" />
+                    <ValidationMessage For="@(() => model.Location)" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Макс. участников</label>
+                        <InputNumber @bind-Value="model.MaxParticipants" class="form-control" />
+                        <ValidationMessage For="@(() => model.MaxParticipants)" />
+                    </div>
+
+                  
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" @onclick="GoBack" disabled="@isSaving">Отмена</button>
+                    <button type="submit" class="btn-primary" disabled="@isSaving">
+                        @(isSaving ? "Сохранение..." : "Сохранить")
+                    </button>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Event? eventItem;
+    private bool isAuthorized;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private string? successMessage;
+
+    private EditEventModel model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEvent();
+    }
+
+    private async Task LoadEvent()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            eventItem = await EventService.GetEventByIdAsync(Id);
+
+            if (eventItem == null)
+            {
+                errorMessage = "Мероприятие не найдено.";
+                return;
+            }
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManager.GetUserAsync(authState.User);
+
+            isAuthorized = user != null && user.Id == eventItem.OrganizerId;
+
+            if (!isAuthorized)
+                return;
+
+            model = new EditEventModel
+            {
+                Title = eventItem.Title,
+                Description = eventItem.Description,
+                EventDate = eventItem.StartDate.Date,
+                EventTime = eventItem.StartDate.ToString("HH:mm"),
+                Location = eventItem.Location,
+                MaxParticipants = eventItem.MaxParticipants,
+             
+            };
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка загрузки: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveEvent()
+    {
+        if (eventItem == null || !isAuthorized)
+            return;
+
+        errorMessage = null;
+        successMessage = null;
+        isSaving = true;
+
+        try
+        {
+            if (!TimeOnly.TryParse(model.EventTime, out var parsedTime))
+            {
+                errorMessage = "Введите время в формате ЧЧ:мм, например 14:30.";
+                return;
+            }
+
+            var startDateTime = model.EventDate.Date.Add(parsedTime.ToTimeSpan());
+
+            if (startDateTime <= DateTime.Now)
+            {
+                errorMessage = "Дата и время мероприятия должны быть в будущем.";
+                return;
+            }
+
+            var updatedEvent = new Event
+            {
+                Id = eventItem.Id,
+                Title = model.Title.Trim(),
+                Description = model.Description.Trim(),
+                StartDate = startDateTime,
+                EndDate = startDateTime.AddHours(2),
+                Location = model.Location.Trim(),
+                MaxParticipants = model.MaxParticipants,
+                Price = model.Price,
+
+                OrganizerId = eventItem.OrganizerId,
+                CategoryId = eventItem.CategoryId,
+                CreatedAt = eventItem.CreatedAt,
+                UpdatedAt = DateTime.UtcNow,
+
+                ModerationStatus = EventModerationStatus.Pending,
+                Status = EventStatus.Draft,
+                ModeratedAt = null,
+                ModeratedById = null
+            };
+
+            var result = await EventService.UpdateEventAsync(Id, updatedEvent);
+
+            if (result == null)
+            {
+                errorMessage = "Не удалось сохранить изменения.";
+                return;
+            }
+
+            successMessage = "Изменения сохранены. Мероприятие отправлено на повторную модерацию.";
+            NavigationManager.NavigateTo("/profile");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при сохранении: {ex.Message}";
+            Console.WriteLine(ex);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/profile");
+    }
+
+    private class EditEventModel
+    {
+        [Required(ErrorMessage = "Введите название")]
+        [StringLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Введите описание")]
+        [StringLength(1000)]
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Укажите дату")]
+        public DateTime EventDate { get; set; } = DateTime.Today.AddDays(1);
+
+        [Required(ErrorMessage = "Укажите время")]
+        public string EventTime { get; set; } = "12:00";
+
+        [Required(ErrorMessage = "Укажите место")]
+        [StringLength(500)]
+        public string Location { get; set; } = string.Empty;
+
+        [Range(1, 100000, ErrorMessage = "Количество участников должно быть больше 0")]
+        public int MaxParticipants { get; set; } = 10;
+
+        [Range(0, 1000000, ErrorMessage = "Цена не может быть отрицательной")]
+        public decimal Price { get; set; }
+    }
+}

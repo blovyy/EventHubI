@@ -1,0 +1,83 @@
+﻿@page "/reviews"
+@rendermode InteractiveServer
+@using EventHub.Data.Models
+@using EventHub.Services.Interfaces
+
+@inject IReviewService ReviewService
+
+<PageTitle>Отзывы | EventHub</PageTitle>
+
+<div class="reviews-page">
+    <div class="page-header">
+        <h1>Отзывы участников</h1>
+        <p>Здесь собраны отзывы о прошедших образовательных мероприятиях</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-box">Загрузка отзывов...</div>
+    }
+    else if (reviews == null || !reviews.Any())
+    {
+        <div class="empty-box">
+            Пока нет одобренных отзывов
+        </div>
+    }
+    else
+    {
+        <div class="reviews-grid">
+            @foreach (var review in reviews)
+            {
+                <div class="review-card">
+                    <div class="review-top">
+                        <div class="review-user">
+                            @GetUserName(review)
+                        </div>
+                        <div class="review-rating">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                <span>@(i <= review.Rating ? "★" : "☆")</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="review-text">
+                        @review.Text
+                    </div>
+
+                    <div class="review-meta">
+                        <div>@review.Event?.Title</div>
+                        <div>@review.CreatedAt.ToString("dd.MM.yyyy")</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+
+
+@code {
+    private List<Review>? reviews;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reviews = await ReviewService.GetApprovedReviewsAsync();
+        isLoading = false;
+    }
+
+    private string GetUserName(Review review)
+    {
+        if (review.User != null)
+        {
+            var fullName = $"{review.User.FirstName} {review.User.LastName}".Trim();
+            if (!string.IsNullOrWhiteSpace(fullName))
+                return fullName;
+            if (!string.IsNullOrWhiteSpace(review.User.UserName))
+                return review.User.UserName;
+        }
+
+        return "Пользователь";
+    }
+}

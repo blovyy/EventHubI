@@ -1,0 +1,307 @@
+﻿@page "/event/{id:int}"
+@using EventHub.Data
+@using EventHub.Data.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="event-details-container">
+    <h3>Карточка мероприятия № @Id</h3>
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Загрузка...</div>
+    }
+    else if (eventData == null)
+    {
+        <div class="error-message">
+            <p>Мероприятие с ID @Id не найдено</p>
+            <NavLink href="/events" class="btn-back">← Вернуться к списку</NavLink>
+        </div>
+    }
+    else
+    {
+        var freePlaces = eventData.MaxParticipants - eventData.Participants.Count;
+
+        <div class="details-card">
+            <div class="info-header">
+                <div class="info-icon detail-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 4h6l1 2h3v14H5V6h3z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.8" />
+                        <path d="M8 11h8M8 15h8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                    </svg>
+                </div>
+                <div class="info-title">
+                    <h4>@eventData.Title</h4>
+                    <p>Создано: @eventData.CreatedAt.ToString("dd.MM.yyyy HH:mm")</p>
+                </div>
+            </div>
+
+            <div class="details-grid">
+                <div class="details-section">
+                    <h5 class="section-title">Организатор</h5>
+
+                    @if (eventData.Organizer != null)
+                    {
+                        <div class="detail-item">
+                            <label class="detail-label">Имя</label>
+                            <div class="detail-value">@eventData.Organizer.FullName</div>
+                        </div>
+                    }
+                </div>
+
+                <div class="details-section">
+                    <h5 class="section-title">Информация о мероприятии</h5>
+
+                    <div class="detail-item">
+                        <label class="detail-label">Название</label>
+                        <div class="detail-value">@eventData.Title</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label class="detail-label">Тип мероприятия</label>
+                        <div class="detail-value">@GetEventTypeLabel(eventData.EventType)</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label class="detail-label">Описание</label>
+                        <div class="detail-value description">@eventData.Description</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label class="detail-label">Дата начала</label>
+                        <div class="detail-value">@eventData.StartDate.ToString("dd.MM.yyyy HH:mm")</div>
+                    </div>
+
+                    <div class="detail-item">
+                        <label class="detail-label">Место проведения</label>
+                        <div class="detail-value">@eventData.Location</div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-item half">
+                            <label class="detail-label">Макс. участников</label>
+                            <div class="detail-value">@eventData.MaxParticipants</div>
+                        </div>
+
+                        <div class="detail-item half">
+                            <label class="detail-label">Свободные места</label>
+                            <div class="detail-value">@freePlaces</div>
+                        </div>
+                    </div>
+
+                    <div class="detail-row">
+                        <div class="detail-item half">
+                            <label class="detail-label">Записано участников</label>
+                            <div class="detail-value">@eventData.Participants.Count</div>
+                        </div>
+
+                        <div class="detail-item half">
+                            <label class="detail-label">Цена</label>
+                            <div class="detail-value">@(eventData.Price > 0 ? $"{eventData.Price} ₽" : "Бесплатно")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (canViewParticipants)
+            {
+                <div class="participants-section">
+                    <h5 class="section-title">Участники (@eventData.Participants.Count)</h5>
+
+                    @if (eventData.Participants.Any())
+                    {
+                        <div class="participants-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ФИО</th>
+                                        <th>Email</th>
+                                        <th>Телефон</th>
+                                        <th>Дата регистрации</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var participant in eventData.Participants)
+                                    {
+                                        <tr>
+                                            <td>@participant.FullName</td>
+                                            <td>@participant.Email</td>
+                                            <td>@participant.PhoneNumber</td>
+                                            <td>@participant.RegisteredAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="empty-participants">Пока нет зарегистрированных участников</div>
+                    }
+                </div>
+            }
+
+            <div class="participants-section">
+                <h5 class="section-title">Отзывы</h5>
+
+                @if (eventData.Reviews.Any())
+                {
+                    <div class="reviews-list">
+                        @foreach (var review in eventData.Reviews)
+                        {
+                            <div class="review-card">
+                                <div><strong>@review.UserName</strong> — @review.Rating/5</div>
+                                <div>@review.Text</div>
+                                <small>@review.CreatedAt.ToString("dd.MM.yyyy HH:mm")</small>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-participants">Пока нет отзывов</div>
+                }
+            </div>
+
+            <div class="actions-section">
+                <NavLink href="/events" class="btn-back">← Назад к мероприятиям</NavLink>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private EventData? eventData;
+    private bool isLoading = true;
+    private bool canViewParticipants;
+
+    private class EventData
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public int MaxParticipants { get; set; }
+        public decimal Price { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string OrganizerId { get; set; } = string.Empty;
+        public EventType EventType { get; set; }
+
+        public OrganizerData? Organizer { get; set; }
+        public List<ParticipantData> Participants { get; set; } = new();
+        public List<ReviewData> Reviews { get; set; } = new();
+    }
+
+    private class OrganizerData
+    {
+        public string FullName { get; set; } = string.Empty;
+    }
+
+    private class ParticipantData
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+        public DateTime RegisteredAt { get; set; }
+    }
+
+    private class ReviewData
+    {
+        public string UserName { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string Text { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEvent();
+    }
+
+    private async Task LoadEvent()
+    {
+        isLoading = true;
+
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var isAdmin = user.IsInRole("Admin");
+
+            eventData = await context.Events
+                .Where(x => x.Id == Id)
+                .Select(x => new EventData
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    Description = x.Description,
+                    StartDate = x.StartDate,
+                    Location = x.Location,
+                    MaxParticipants = x.MaxParticipants,
+                    Price = x.Price,
+                    CreatedAt = x.CreatedAt,
+                    OrganizerId = x.OrganizerId ?? string.Empty,
+                    EventType = x.EventType,
+                    Organizer = x.Organizer != null
+                        ? new OrganizerData
+                        {
+                            FullName = ((x.Organizer.FirstName ?? "") + " " + (x.Organizer.LastName ?? "")).Trim()
+                        }
+                        : null,
+                    Participants = x.Participants.Select(p => new ParticipantData
+                    {
+                        FullName = p.FullName ?? "Не указано",
+                        Email = p.Email ?? "Не указано",
+                        PhoneNumber = p.PhoneNumber ?? "Не указано",
+                        RegisteredAt = p.RegisteredAt
+                    }).ToList(),
+                    Reviews = x.Reviews
+                        .Where(r => r.ModerationStatus == ReviewModerationStatus.Approved)
+                        .OrderByDescending(r => r.CreatedAt)
+                        .Select(r => new ReviewData
+                        {
+                            UserName = r.User != null
+                                ? (((r.User.FirstName ?? "") + " " + (r.User.LastName ?? "")).Trim())
+                                : "Пользователь",
+                            Rating = r.Rating,
+                            Text = r.Text,
+                            CreatedAt = r.CreatedAt
+                        }).ToList()
+                })
+                .AsNoTracking()
+                .AsSplitQuery()
+                .FirstOrDefaultAsync();
+
+            if (eventData != null)
+            {
+                canViewParticipants = isAdmin || userId == eventData.OrganizerId;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetEventTypeLabel(EventType type) => type switch
+    {
+        EventType.Lecture => "Лекция",
+        EventType.Seminar => "Семинар",
+        EventType.Workshop => "Мастер-класс",
+        EventType.Conference => "Конференция",
+        EventType.Training => "Тренинг",
+        EventType.Webinar => "Вебинар",
+        EventType.Meeting => "Встреча",
+        _ => "Другое"
+    };
+}

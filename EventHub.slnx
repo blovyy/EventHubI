@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="EventHub/EventHub.Client/EventHub.Client.csproj" />
+  <Project Path="EventHub/EventHub/EventHub.csproj" />
+</Solution>

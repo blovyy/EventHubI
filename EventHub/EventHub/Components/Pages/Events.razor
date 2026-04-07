@@ -1,0 +1,450 @@
+﻿@page "/events"
+@using System.Security.Claims
+@using EventHub.Data
+@using EventHub.Data.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@rendermode InteractiveServer
+
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Мероприятия | EventHub</PageTitle>
+
+<div class="catalog-container">
+    <div class="page-header">
+        <h1 class="catalog-title">Все мероприятия</h1>
+        <p class="page-description">
+            Выберите интересующее образовательное мероприятие и запишитесь на него
+        </p>
+    </div>
+
+    <div class="filters-card">
+        <div class="filters-grid">
+            <div class="form-group">
+                <label>Поиск по названию</label>
+                <InputText @bind-Value="searchText"
+                           @bind-Value:event="oninput"
+                           class="form-control"
+                           placeholder="Введите название..." />
+            </div>
+
+            <div class="form-group">
+                <label>Тип мероприятия</label>
+                <InputSelect @bind-Value="selectedEventType" class="form-control">
+                    <option value="">Все типы</option>
+                    @foreach (var type in Enum.GetValues<EventType>())
+                    {
+                        <option value="@((int)type)">@GetEventTypeLabel(type)</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="form-group">
+                <label>Дата</label>
+                <InputSelect @bind-Value="selectedDateFilter" class="form-control">
+                    <option value="@DateFilterType.All">Все</option>
+                    <option value="@DateFilterType.Today">Сегодня</option>
+                    <option value="@DateFilterType.ThisWeek">На этой неделе</option>
+                    <option value="@DateFilterType.ThisMonth">В этом месяце</option>
+                    <option value="@DateFilterType.FutureOnly">Только будущие</option>
+                </InputSelect>
+            </div>
+        </div>
+
+        <div class="filter-checkbox-row">
+            <label class="filter-checkbox-label">
+                <InputCheckbox @bind-Value="onlyAvailablePlaces" class="filter-checkbox" />
+                <span>Только где есть места</span>
+            </label>
+        </div>
+
+        <div class="filters-actions">
+            <button type="button" class="btn btn-secondary" @onclick="ResetFilters">
+                Сбросить фильтры
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(infoMessage))
+    {
+        <div class="success-message">
+            @infoMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="error-message">
+            @errorMessage
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Загрузка мероприятий...</p>
+        </div>
+    }
+    else if (!FilteredEvents.Any())
+    {
+        <div class="no-courses">
+            <p>По вашему запросу мероприятий не найдено</p>
+            <NavLink href="/create" class="btn btn-primary">Создать мероприятие</NavLink>
+        </div>
+    }
+    else
+    {
+        <div class="events-grid">
+            @foreach (var ev in FilteredEvents)
+            {
+                var isRegistered = registeredEventIds.Contains(ev.Id);
+                var freePlaces = ev.MaxParticipants - ev.ParticipantCount;
+                var isFull = freePlaces <= 0;
+
+                <div class="event-card" @onclick="() => GoToEvent(ev.Id)">
+                    <div class="event-header">
+                        <h3 class="event-title">@ev.Title</h3>
+                        <span class="event-status status-approved">Одобрено</span>
+                    </div>
+
+                    <div class="event-body">
+                        <p class="event-description">@ev.Description</p>
+
+                        <div class="event-details">
+                            <span class="detail-item">@GetEventTypeLabel(ev.EventType)</span>
+                            <span class="detail-item">@ev.StartDate.ToString("dd.MM.yyyy HH:mm")</span>
+                            <span class="detail-item">@ev.Location</span>
+                            <span class="detail-item">@ev.ParticipantCount / @ev.MaxParticipants участников</span>
+                            <span class="detail-item">Свободно мест: @freePlaces</span>
+                            <span class="detail-item">Бесплатно</span>
+                        </div>
+                    </div>
+
+                    <div class="event-footer">
+                        @if (isRegistered)
+                        {
+                            <button class="btn-registered" @onclick:stopPropagation="true">
+                                Вы записаны
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn-register"
+                                    @onclick="() => RegisterToEvent(ev.Id)"
+                                    @onclick:stopPropagation="true"
+                                    disabled="@isSubmitting || isFull">
+                                @(isFull ? "Мест нет" : isSubmitting ? "Подождите..." : "Записаться")
+                            </button>
+                        }
+
+                        <button class="btn-view"
+                                @onclick="() => GoToEvent(ev.Id)"
+                                @onclick:stopPropagation="true">
+                            Подробнее
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .filter-checkbox-row {
+        margin-top: 12px;
+        margin-bottom: 16px;
+    }
+
+    .filter-checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .filter-checkbox {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        flex: 0 0 auto;
+    }
+
+    .filters-actions {
+        margin-top: 8px;
+    }
+</style>
+
+@code {
+    private List<EventCardModel> events = new();
+    private HashSet<int> registeredEventIds = new();
+    private string? currentUserId;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string? infoMessage;
+    private string? errorMessage;
+
+    private string searchText = string.Empty;
+    private string selectedEventType = "";
+    private DateFilterType selectedDateFilter = DateFilterType.All;
+    private bool onlyAvailablePlaces = false;
+
+    private IEnumerable<EventCardModel> FilteredEvents => events.Where(PassesFilters);
+
+    private sealed class EventCardModel
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public string Location { get; set; } = string.Empty;
+        public int MaxParticipants { get; set; }
+        public int ParticipantCount { get; set; }
+        public EventType EventType { get; set; }
+    }
+
+    private enum DateFilterType
+    {
+        All,
+        Today,
+        ThisWeek,
+        ThisMonth,
+        FutureOnly
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEvents();
+    }
+
+    private async Task LoadEvents()
+    {
+        isLoading = true;
+        infoMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            currentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            events = await context.Events
+                .Where(e => e.ModerationStatus == EventModerationStatus.Approved)
+                .OrderBy(e => e.StartDate)
+                .Select(e => new EventCardModel
+                {
+                    Id = e.Id,
+                    Title = e.Title,
+                    Description = e.Description,
+                    StartDate = e.StartDate,
+                    Location = e.Location,
+                    MaxParticipants = e.MaxParticipants,
+                    ParticipantCount = e.Participants.Count(),
+                    EventType = e.EventType
+                })
+                .ToListAsync();
+
+            registeredEventIds.Clear();
+
+            if (!string.IsNullOrWhiteSpace(currentUserId))
+            {
+                registeredEventIds = await context.Participants
+                    .Where(p => p.UserId == currentUserId)
+                    .Select(p => p.EventId)
+                    .ToHashSetAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка загрузки мероприятий: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool PassesFilters(EventCardModel ev)
+    {
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var query = searchText.Trim();
+
+            if (string.IsNullOrWhiteSpace(ev.Title) ||
+                !ev.Title.Contains(query, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedEventType))
+        {
+            if (!int.TryParse(selectedEventType, out var eventTypeValue))
+                return false;
+
+            if ((int)ev.EventType != eventTypeValue)
+                return false;
+        }
+
+        if (onlyAvailablePlaces && ev.ParticipantCount >= ev.MaxParticipants)
+        {
+            return false;
+        }
+
+        var now = DateTime.Now;
+
+        switch (selectedDateFilter)
+        {
+            case DateFilterType.Today:
+                if (ev.StartDate.Date != now.Date)
+                    return false;
+                break;
+
+            case DateFilterType.ThisWeek:
+                var diff = ((int)now.DayOfWeek == 0 ? 7 : (int)now.DayOfWeek) - 1;
+                var startOfWeek = now.Date.AddDays(-diff);
+                var endOfWeek = startOfWeek.AddDays(7);
+
+                if (ev.StartDate < startOfWeek || ev.StartDate >= endOfWeek)
+                    return false;
+                break;
+
+            case DateFilterType.ThisMonth:
+                if (ev.StartDate.Month != now.Month || ev.StartDate.Year != now.Year)
+                    return false;
+                break;
+
+            case DateFilterType.FutureOnly:
+                if (ev.StartDate < now)
+                    return false;
+                break;
+        }
+
+        return true;
+    }
+
+    private void ResetFilters()
+    {
+        searchText = string.Empty;
+        selectedEventType = "";
+        selectedDateFilter = DateFilterType.All;
+        onlyAvailablePlaces = false;
+    }
+
+    private void GoToEvent(int id)
+    {
+        NavigationManager.NavigateTo($"/event/{id}");
+    }
+
+    private async Task RegisterToEvent(int eventId)
+    {
+        if (isSubmitting)
+            return;
+
+        infoMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            isSubmitting = true;
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (!(user.Identity?.IsAuthenticated ?? false))
+            {
+                NavigationManager.NavigateTo("/Account/Login");
+                return;
+            }
+
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Не удалось определить пользователя.";
+                return;
+            }
+
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            var eventItem = await context.Events
+                .Include(e => e.Participants)
+                .FirstOrDefaultAsync(e => e.Id == eventId);
+
+            if (eventItem == null)
+            {
+                errorMessage = "Мероприятие не найдено.";
+                return;
+            }
+
+            if (eventItem.ModerationStatus != EventModerationStatus.Approved)
+            {
+                errorMessage = "Запись на это мероприятие недоступна.";
+                return;
+            }
+
+            var alreadyRegistered = await context.Participants
+                .AnyAsync(p => p.EventId == eventId && p.UserId == userId);
+
+            if (alreadyRegistered)
+            {
+                errorMessage = "Вы уже записаны на это мероприятие.";
+                return;
+            }
+
+            var participantsCount = await context.Participants
+                .CountAsync(p => p.EventId == eventId);
+
+            if (participantsCount >= eventItem.MaxParticipants)
+            {
+                errorMessage = "Свободных мест больше нет.";
+                return;
+            }
+
+            var currentUser = await context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            var participant = new Participant
+            {
+                UserId = userId,
+                EventId = eventId,
+                RegisteredAt = DateTime.UtcNow,
+                IsCheckedIn = false,
+                FullName = currentUser != null ? $"{currentUser.FirstName} {currentUser.LastName}".Trim() : null,
+                Email = currentUser?.Email,
+                PhoneNumber = currentUser?.PhoneNumber
+            };
+
+            context.Participants.Add(participant);
+            await context.SaveChangesAsync();
+
+            infoMessage = "Вы успешно записались на мероприятие.";
+            await LoadEvents();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Не удалось записаться на мероприятие: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static string GetEventTypeLabel(EventType type) => type switch
+    {
+        EventType.Lecture => "Лекция",
+        EventType.Seminar => "Семинар",
+        EventType.Workshop => "Мастер-класс",
+        EventType.Conference => "Конференция",
+        EventType.Training => "Тренинг",
+        EventType.Webinar => "Вебинар",
+        EventType.Meeting => "Встреча",
+        _ => "Другое"
+    };
+}

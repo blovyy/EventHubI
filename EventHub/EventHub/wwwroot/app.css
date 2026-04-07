@@ -1,0 +1,62 @@
+html, body {
+    font-family: inherit;
+}
+
+a, .btn-link {
+    color: inherit;
+}
+
+.btn-primary {
+    color: inherit;
+    background-color: transparent;
+    border-color: transparent;
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+    box-shadow: none;
+}
+
+.content {
+    padding-top: 0;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid rgba(34, 139, 96, 0.5);
+}
+
+.invalid {
+    outline: 1px solid rgba(203, 76, 67, 0.5);
+}
+
+.validation-message {
+    color: #a73e36;
+}
+
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}
+
+.darker-border-checkbox.form-check-input {
+    border-color: #929292;
+}
+
+.form-floating > .form-control-plaintext::placeholder,
+.form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder,
+.form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}

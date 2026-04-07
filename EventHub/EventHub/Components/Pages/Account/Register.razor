@@ -1,0 +1,227 @@
+﻿@page "/Account/Register"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using EventHub.Data.Models
+
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Register> Logger
+@inject NavigationManager NavigationManager
+
+<PageTitle>Регистрация | EventHub</PageTitle>
+
+<section class="auth-shell auth-shell-register">
+    <div class="auth-grid">
+        <div class="auth-panel auth-panel-copy">
+            <span class="section-badge">Новый аккаунт</span>
+            <h1>Создайте аккуратное пространство для своих мероприятий</h1>
+            <p class="auth-lead">
+                Регистрация открывает доступ к созданию событий, управлению участниками и сбору отзывов в одной системе.
+            </p>
+
+            <div class="auth-highlights">
+                <div class="auth-highlight">
+                    <span class="auth-highlight-value">Организация</span>
+                    <span class="auth-highlight-label">мероприятий, расписания и описаний</span>
+                </div>
+                <div class="auth-highlight">
+                    <span class="auth-highlight-value">Контроль</span>
+                    <span class="auth-highlight-label">участников, отзывов и статусов публикации</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-panel auth-panel-form">
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="error-message">
+                    @errorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="success-message">
+                    @successMessage
+                </div>
+            }
+
+            <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register" class="auth-form">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="validation-summary-errors" />
+
+                <div class="auth-form-header">
+                    <h2>Регистрация</h2>
+                    <p>Заполните только нужные поля. Остальное можно будет настроить позже.</p>
+                </div>
+
+                <div class="auth-form-grid auth-form-grid-two">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <InputText @bind-Value="Input.Email"
+                                   id="email"
+                                   class="form-control"
+                                   placeholder="name@example.com"
+                                   disabled="@isProcessing" />
+                        <ValidationMessage For="@(() => Input.Email)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Телефон</label>
+                        <InputText @bind-Value="Input.PhoneNumber"
+                                   id="phone"
+                                   class="form-control"
+                                   placeholder="+7 (999) 123-45-67"
+                                   disabled="@isProcessing" />
+                        <ValidationMessage For="@(() => Input.PhoneNumber)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="firstName">Имя</label>
+                        <InputText @bind-Value="Input.FirstName"
+                                   id="firstName"
+                                   class="form-control"
+                                   placeholder="Иван"
+                                   disabled="@isProcessing" />
+                        <ValidationMessage For="@(() => Input.FirstName)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="lastName">Фамилия</label>
+                        <InputText @bind-Value="Input.LastName"
+                                   id="lastName"
+                                   class="form-control"
+                                   placeholder="Иванов"
+                                   disabled="@isProcessing" />
+                        <ValidationMessage For="@(() => Input.LastName)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Пароль</label>
+                        <InputText @bind-Value="Input.Password"
+                                   id="password"
+                                   type="password"
+                                   class="form-control"
+                                   placeholder="••••••••"
+                                   disabled="@isProcessing" />
+                        <ValidationMessage For="@(() => Input.Password)" class="validation-message" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Подтверждение пароля</label>
+                        <InputText @bind-Value="Input.ConfirmPassword"
+                                   id="confirmPassword"
+                                   type="password"
+                                   class="form-control"
+                                   placeholder="••••••••"
+                                   disabled="@isProcessing" />
+                        <ValidationMessage For="@(() => Input.ConfirmPassword)" class="validation-message" />
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large auth-submit" disabled="@isProcessing">
+                    @(isProcessing ? "Регистрация..." : "Создать аккаунт")
+                </button>
+
+                <div class="auth-switch">
+                    <span>Уже есть аккаунт?</span>
+                    <NavLink href="/Account/Login">Войти</NavLink>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</section>
+
+@code {
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isProcessing;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    private async Task RegisterUser()
+    {
+        if (isProcessing)
+            return;
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var email = Input.Email.Trim();
+            var firstName = Input.FirstName.Trim();
+            var lastName = Input.LastName.Trim();
+            var phone = string.IsNullOrWhiteSpace(Input.PhoneNumber) ? null : Input.PhoneNumber.Trim();
+
+            var existingUser = await UserManager.FindByEmailAsync(email);
+            if (existingUser != null)
+            {
+                errorMessage = "Пользователь с таким email уже существует.";
+                return;
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                PhoneNumber = phone,
+                FirstName = firstName,
+                LastName = lastName,
+                EmailConfirmed = true
+            };
+
+            var result = await UserManager.CreateAsync(user, Input.Password);
+
+            if (!result.Succeeded)
+            {
+                errorMessage = string.Join(" ", result.Errors.Select(e => e.Description));
+                return;
+            }
+
+            Logger.LogInformation("Пользователь {Email} успешно создан.", user.Email);
+
+            successMessage = "Регистрация прошла успешно!";
+            await Task.Delay(1000);
+            NavigationManager.NavigateTo("/Account/Login");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при регистрации: {ex.Message}";
+            Logger.LogError(ex, "Ошибка регистрации для пользователя {Email}", Input.Email);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Email обязателен для заполнения")]
+        [EmailAddress(ErrorMessage = "Введите корректный email адрес")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Имя обязательно для заполнения")]
+        [StringLength(100, ErrorMessage = "Имя слишком длинное")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Фамилия обязательна для заполнения")]
+        [StringLength(100, ErrorMessage = "Фамилия слишком длинная")]
+        public string LastName { get; set; } = string.Empty;
+
+        [Phone(ErrorMessage = "Введите корректный номер телефона")]
+        public string? PhoneNumber { get; set; }
+
+        [Required(ErrorMessage = "Пароль обязателен для заполнения")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть от 6 до 100 символов")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Подтвердите пароль")]
+        [DataType(DataType.Password)]
+        [Compare(nameof(Password), ErrorMessage = "Пароли не совпадают")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

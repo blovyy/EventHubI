@@ -1,0 +1,277 @@
+﻿@page "/profile/participated"
+@rendermode InteractiveServer
+@using EventHub.Data.Models
+@using EventHub.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@attribute [Authorize]
+
+@inject IParticipantService ParticipantService
+@inject IReviewService ReviewService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="profile-participated-container">
+    <div class="page-header">
+        <button class="back-button" @onclick="GoBack">← Назад к профилю</button>
+        <h1 class="page-title">Посещённые мероприятия</h1>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="info-box">@message</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="error-box">@errorMessage</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">
+            <p>Загрузка мероприятий...</p>
+        </div>
+    }
+    else if (participatedEvents == null || !participatedEvents.Any())
+    {
+        <div class="empty-state">
+            <p>Вы пока не посетили ни одного мероприятия</p>
+            <button class="btn-primary" @onclick="GoToEvents">Найти мероприятия</button>
+        </div>
+    }
+    else
+    {
+        <div class="events-grid">
+            @foreach (var ev in participatedEvents)
+            {
+                var existingReview = myReviews.FirstOrDefault(x => x.EventId == ev.Id);
+                var canLeaveReview = existingReview == null && ev.EndDate <= DateTime.Now;
+
+                <div class="event-card">
+                    <div class="event-header">
+                        <h3>@ev.Title</h3>
+                        <span>@ev.StartDate.ToString("dd.MM.yyyy")</span>
+                    </div>
+
+                    <p>@ev.Description</p>
+
+                    <div class="event-footer">
+                        <button class="btn-secondary" @onclick="() => GoToEvent(ev.Id)">Подробнее</button>
+
+                        @if (ev.EndDate <= DateTime.Now)
+                        {
+                            @if (canLeaveReview)
+                            {
+                                <button class="btn-primary" @onclick="() => OpenReviewModal(ev.Id)">Оставить отзыв</button>
+                            }
+                            else if (existingReview != null)
+                            {
+                                <span class="review-state">
+                                    Отзыв: @GetReviewModerationText(existingReview.ModerationStatus)
+                                </span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="review-state">
+                                Отзыв будет доступен после завершения мероприятия
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@if (isReviewModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <h2>Оставить отзыв</h2>
+
+            <EditForm Model="reviewModel" OnValidSubmit="SubmitReview">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="form-group">
+                    <label>Оценка</label>
+                    <InputNumber @bind-Value="reviewModel.Rating" class="form-control" />
+                </div>
+
+                <div class="form-group">
+                    <label>Текст отзыва</label>
+                    <InputTextArea @bind-Value="reviewModel.Text" class="form-control" rows="5" />
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" @onclick="CloseReviewModal">Отмена</button>
+                    <button type="submit" class="btn-primary">Отправить</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<style>
+    .info-box, .error-box {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border-radius: 12px;
+    }
+
+    .info-box {
+        background: #eef6ff;
+        color: #2c5282;
+    }
+
+    .error-box {
+        background: #fff1f2;
+        color: #be123c;
+    }
+
+    .events-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .event-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.2rem;
+        box-shadow: 0 5px 20px rgba(143, 182, 255, 0.1);
+        border: 1px solid #d4e0f0;
+    }
+
+    .event-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .event-footer {
+        margin-top: 1rem;
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .review-state {
+        color: #64748b;
+        font-size: 0.9rem;
+    }
+</style>
+
+@code {
+    private List<Event>? participatedEvents;
+    private List<Review> myReviews = new();
+    private bool isLoading = true;
+    private string? currentUserId;
+    private string? message;
+    private string? errorMessage;
+
+    private bool isReviewModalOpen;
+    private int selectedEventId;
+
+    private ReviewCreateModel reviewModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(currentUserId))
+                return;
+
+            var participations = await ParticipantService.GetParticipationsByUserAsync(currentUserId);
+
+            participatedEvents = participations
+                .Where(p => p.Event != null)
+                .Select(p => p.Event!)
+                .DistinctBy(e => e.Id)
+                .OrderByDescending(e => e.StartDate)
+                .ToList();
+
+            myReviews = await ReviewService.GetReviewsByUserAsync(currentUserId);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenReviewModal(int eventId)
+    {
+        selectedEventId = eventId;
+        reviewModel = new ReviewCreateModel();
+        isReviewModalOpen = true;
+        errorMessage = null;
+    }
+
+    private void CloseReviewModal()
+    {
+        isReviewModalOpen = false;
+        selectedEventId = 0;
+        reviewModel = new ReviewCreateModel();
+    }
+
+    private async Task SubmitReview()
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+            return;
+
+        var success = await ReviewService.CreateReviewAsync(new Review
+        {
+            EventId = selectedEventId,
+            UserId = currentUserId,
+            Rating = reviewModel.Rating,
+            Text = reviewModel.Text.Trim()
+        });
+
+        if (!success)
+        {
+            errorMessage = "Не удалось отправить отзыв. Его можно оставить только после завершения мероприятия и только один раз.";
+            return;
+        }
+
+        message = "Отзыв отправлен на модерацию.";
+        CloseReviewModal();
+        await LoadData();
+    }
+
+    private string GetReviewModerationText(ReviewModerationStatus status) => status switch
+    {
+        ReviewModerationStatus.Pending => "на модерации",
+        ReviewModerationStatus.Approved => "одобрен",
+        ReviewModerationStatus.Rejected => "отклонён",
+        _ => status.ToString()
+    };
+
+    private void GoBack() => NavigationManager.NavigateTo("/profile");
+    private void GoToEvents() => NavigationManager.NavigateTo("/events");
+    private void GoToEvent(int id) => NavigationManager.NavigateTo($"/event/{id}");
+
+    private class ReviewCreateModel
+    {
+        [Range(1, 5, ErrorMessage = "Оценка должна быть от 1 до 5")]
+        public int Rating { get; set; } = 5;
+
+        [Required(ErrorMessage = "Введите текст отзыва")]
+        [StringLength(1000, MinimumLength = 5)]
+        public string Text { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,191 @@
+﻿@page "/Account/Login"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using EventHub.Data
+@using EventHub.Data.Models
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+
+<PageTitle>Вход | EventHub</PageTitle>
+
+<section class="auth-shell auth-shell-login">
+    <div class="auth-grid">
+        <div class="auth-panel auth-panel-copy">
+            <span class="section-badge">Вход в систему</span>
+            <h1>Возвращайтесь к своим событиям без лишних шагов</h1>
+            <p class="auth-lead">
+                Управляйте регистрациями, следите за отзывами и держите все мероприятия в одном аккуратном кабинете.
+            </p>
+
+            <div class="auth-highlights">
+                <div class="auth-highlight">
+                    <span class="auth-highlight-value">1 панель</span>
+                    <span class="auth-highlight-label">для мероприятий, модерации и участников</span>
+                </div>
+                <div class="auth-highlight">
+                    <span class="auth-highlight-value">Быстрый вход</span>
+                    <span class="auth-highlight-label">без лишней перегруженной формы</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-panel auth-panel-form">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="error-message">
+                    @errorMessage
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="success-message">
+                    @successMessage
+                </div>
+            }
+
+            @if (showLoginForm)
+            {
+                <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login" class="auth-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="validation-summary-errors" />
+
+                    <div class="auth-form-header">
+                        <h2>Войти в аккаунт</h2>
+                        <p>Введите email и пароль, чтобы открыть рабочее пространство EventHub.</p>
+                    </div>
+
+                    <div class="auth-form-grid">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <InputText @bind-Value="Input.Email"
+                                       id="email"
+                                       class="form-control"
+                                       placeholder="name@example.com"
+                                       disabled="@isProcessing" />
+                            <ValidationMessage For="() => Input.Email" class="validation-message" />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Пароль</label>
+                            <InputText type="password"
+                                       @bind-Value="Input.Password"
+                                       id="password"
+                                       class="form-control"
+                                       placeholder="••••••••"
+                                       disabled="@isProcessing" />
+                            <ValidationMessage For="() => Input.Password" class="validation-message" />
+                        </div>
+                    </div>
+
+                    <div class="auth-form-footer">
+                        <label class="checkbox-label auth-checkbox">
+                            <InputCheckbox @bind-Value="Input.RememberMe" disabled="@isProcessing" />
+                            <span>Запомнить меня</span>
+                        </label>
+
+                        <NavLink href="/Account/ForgotPassword" class="auth-text-link">Забыли пароль?</NavLink>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large auth-submit" disabled="@isProcessing">
+                        @(isProcessing ? "Вход..." : "Войти")
+                    </button>
+
+                    <div class="auth-switch">
+                        <span>Еще нет аккаунта?</span>
+                        <NavLink href="/Account/Register">Создать его</NavLink>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <div class="auth-success">
+                    <h2>Вход выполнен</h2>
+                    <p>Сейчас перенаправим вас на главную страницу.</p>
+                    <NavLink href="/" class="btn btn-primary btn-large auth-submit">Перейти на главную</NavLink>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isProcessing = false;
+    private bool showLoginForm = true;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private async Task LoginUser()
+    {
+        if (isProcessing) return;
+
+        try
+        {
+            isProcessing = true;
+            errorMessage = null;
+            successMessage = null;
+
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+
+            if (user == null)
+            {
+                errorMessage = "Неверный email или пароль.";
+                return;
+            }
+
+            var result = await SignInManager.PasswordSignInAsync(
+                user.UserName ?? user.Email ?? Input.Email,
+                Input.Password,
+                Input.RememberMe,
+                lockoutOnFailure: false);
+
+            if (result.Succeeded)
+            {
+                Logger.LogInformation("Пользователь {Email} успешно вошел", Input.Email);
+
+                successMessage = "Вход выполнен успешно!";
+                showLoginForm = false;
+
+                StateHasChanged();
+                await Task.Delay(1500);
+
+                NavigationManager.NavigateTo(ReturnUrl ?? "/");
+            }
+            else
+            {
+                errorMessage = "Неверный email или пароль.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при входе: {ex.Message}";
+            Logger.LogError(ex, "Ошибка входа для пользователя {Email}", Input.Email);
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Email обязателен")]
+        [EmailAddress(ErrorMessage = "Введите корректный email")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Пароль обязателен")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        public bool RememberMe { get; set; }
+    }
+}

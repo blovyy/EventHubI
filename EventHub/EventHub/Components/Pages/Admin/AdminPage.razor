@@ -1,0 +1,366 @@
+﻿@page "/admin"
+@using EventHub.Data
+@using EventHub.Data.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+
+<div class="admin-orders-container">
+    <div class="page-header">
+        <h1>Панель администратора</h1>
+        <p class="page-description">Модерируй мероприятия и отзывы, следи за статусами и активностью платформы.</p>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="admin-message">@message</div>
+    }
+
+    <div class="stats-cards">
+        <div class="stat-card">
+            <div class="stat-value">@AllEvents.Count</div>
+            <div class="stat-label">Всего мероприятий</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@AllEvents.Count(x => x.ModerationStatus == EventModerationStatus.Pending)</div>
+            <div class="stat-label">На модерации</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@AllEvents.Count(x => x.ModerationStatus == EventModerationStatus.Approved)</div>
+            <div class="stat-label">Одобрено</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@AllEvents.Count(x => x.ModerationStatus == EventModerationStatus.Rejected)</div>
+            <div class="stat-label">Отклонено</div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">Загрузка мероприятий...</div>
+    }
+    else if (AllEvents.Any())
+    {
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Организатор</th>
+                        <th>Дата</th>
+                        <th>Статус модерации</th>
+                        <th>Статус события</th>
+                        <th>Участники</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ev in AllEvents)
+                    {
+                        <tr>
+                            <td>@ev.Id</td>
+                            <td>@ev.Title</td>
+                            <td>@ev.OrganizerName</td>
+                            <td>@ev.StartDate.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>
+                                <span class="status-badge @GetModerationBadgeClass(ev.ModerationStatus)">
+                                    @GetModerationText(ev.ModerationStatus)
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge @GetEventBadgeClass(ev.Status)">
+                                    @GetEventStatusText(ev.Status)
+                                </span>
+                            </td>
+                            <td>@ev.ParticipantCount / @ev.MaxParticipants</td>
+                            <td class="actions-cell">
+                                @if (ev.ModerationStatus == EventModerationStatus.Pending)
+                                {
+                                    <button class="action-btn approve" @onclick="() => ApproveEvent(ev.Id)">Одобрить</button>
+                                    <button class="action-btn reject" @onclick="() => RejectEvent(ev.Id)">Отклонить</button>
+                                }
+                                <a href="/event/@ev.Id" class="action-link">Просмотр</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="no-orders">
+            <p>Пока нет мероприятий</p>
+            <p>Мероприятия появятся здесь, когда пользователи начнут их создавать</p>
+        </div>
+    }
+
+    <hr class="section-divider" />
+
+    <h2>Отзывы на модерации</h2>
+
+    @if (isReviewsLoading)
+    {
+        <div class="loading-spinner">Загрузка отзывов...</div>
+    }
+    else if (PendingReviews.Any())
+    {
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Мероприятие</th>
+                        <th>Пользователь</th>
+                        <th>Оценка</th>
+                        <th>Текст</th>
+                        <th>Дата</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var review in PendingReviews)
+                    {
+                        <tr>
+                            <td>@review.Id</td>
+                            <td>@review.EventTitle</td>
+                            <td>@review.UserName</td>
+                            <td>@review.Rating / 5</td>
+                            <td>@review.Text</td>
+                            <td>@review.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td class="actions-cell">
+                                <button class="action-btn approve" @onclick="() => ApproveReview(review.Id)">Одобрить</button>
+                                <button class="action-btn reject" @onclick="() => RejectReview(review.Id)">Отклонить</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="no-orders">
+            <p>Отзывов на модерации пока нет</p>
+        </div>
+    }
+
+    <div class="actions-section">
+        <a href="/" class="btn-back">← На главную</a>
+    </div>
+</div>
+
+@code {
+    private List<EventListItem> AllEvents = new();
+    private List<ReviewListItem> PendingReviews = new();
+    private bool isLoading = true;
+    private bool isReviewsLoading = true;
+    private string? message;
+
+    private class EventListItem
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string OrganizerName { get; set; } = string.Empty;
+        public DateTime StartDate { get; set; }
+        public EventModerationStatus ModerationStatus { get; set; }
+        public EventStatus Status { get; set; }
+        public int MaxParticipants { get; set; }
+        public int ParticipantCount { get; set; }
+    }
+
+    private class ReviewListItem
+    {
+        public int Id { get; set; }
+        public int EventId { get; set; }
+        public string EventTitle { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string Text { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllData();
+    }
+
+    private async Task LoadAllData()
+    {
+        await LoadEvents();
+        await LoadReviews();
+    }
+
+    private async Task LoadEvents()
+    {
+        isLoading = true;
+
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            AllEvents = await context.Events
+                .Include(x => x.Organizer)
+                .Include(x => x.Participants)
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new EventListItem
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    OrganizerName = x.Organizer != null
+                        ? ((x.Organizer.FirstName ?? "") + " " + (x.Organizer.LastName ?? "")).Trim()
+                        : "Неизвестно",
+                    StartDate = x.StartDate,
+                    ModerationStatus = x.ModerationStatus,
+                    Status = x.Status,
+                    MaxParticipants = x.MaxParticipants,
+                    ParticipantCount = x.Participants.Count
+                })
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadReviews()
+    {
+        isReviewsLoading = true;
+
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+
+            PendingReviews = await context.Reviews
+                .Include(x => x.Event)
+                .Include(x => x.User)
+                .Where(x => x.ModerationStatus == ReviewModerationStatus.Pending)
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new ReviewListItem
+                {
+                    Id = x.Id,
+                    EventId = x.EventId,
+                    EventTitle = x.Event != null ? x.Event.Title : "Без названия",
+                    UserName = x.User != null
+                        ? (((x.User.FirstName ?? "") + " " + (x.User.LastName ?? "")).Trim())
+                        : "Пользователь",
+                    Rating = x.Rating,
+                    Text = x.Text,
+                    CreatedAt = x.CreatedAt
+                })
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        finally
+        {
+            isReviewsLoading = false;
+        }
+    }
+
+    private string GetModerationText(EventModerationStatus status) => status switch
+    {
+        EventModerationStatus.Pending => "На модерации",
+        EventModerationStatus.Approved => "Одобрено",
+        EventModerationStatus.Rejected => "Отклонено",
+        _ => status.ToString()
+    };
+
+    private string GetModerationBadgeClass(EventModerationStatus status) => status switch
+    {
+        EventModerationStatus.Pending => "status-pending",
+        EventModerationStatus.Approved => "status-approved",
+        EventModerationStatus.Rejected => "status-rejected",
+        _ => "status-draft"
+    };
+
+    private string GetEventStatusText(EventStatus status) => status switch
+    {
+        EventStatus.Draft => "Черновик",
+        EventStatus.Published => "Опубликовано",
+        EventStatus.Cancelled => "Отменено",
+        EventStatus.Completed => "Завершено",
+        _ => status.ToString()
+    };
+
+    private string GetEventBadgeClass(EventStatus status) => status switch
+    {
+        EventStatus.Draft => "status-draft",
+        EventStatus.Published => "status-published",
+        EventStatus.Cancelled => "status-cancelled",
+        EventStatus.Completed => "status-completed",
+        _ => "status-draft"
+    };
+
+    private async Task ApproveEvent(int eventId)
+    {
+        await using var context = await DbContextFactory.CreateDbContextAsync();
+
+        var eventToUpdate = await context.Events.FirstOrDefaultAsync(x => x.Id == eventId);
+        if (eventToUpdate is null)
+            return;
+
+        eventToUpdate.ModerationStatus = EventModerationStatus.Approved;
+        eventToUpdate.Status = EventStatus.Published;
+        eventToUpdate.ModeratedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        message = $"Мероприятие #{eventId} одобрено.";
+        await LoadEvents();
+    }
+
+    private async Task RejectEvent(int eventId)
+    {
+        await using var context = await DbContextFactory.CreateDbContextAsync();
+
+        var eventToUpdate = await context.Events.FirstOrDefaultAsync(x => x.Id == eventId);
+        if (eventToUpdate is null)
+            return;
+
+        eventToUpdate.ModerationStatus = EventModerationStatus.Rejected;
+        eventToUpdate.Status = EventStatus.Draft;
+        eventToUpdate.ModeratedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        message = $"Мероприятие #{eventId} отклонено.";
+        await LoadEvents();
+    }
+
+    private async Task ApproveReview(int reviewId)
+    {
+        await using var context = await DbContextFactory.CreateDbContextAsync();
+
+        var review = await context.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId);
+        if (review is null)
+            return;
+
+        review.ModerationStatus = ReviewModerationStatus.Approved;
+        review.ModeratedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        message = $"Отзыв #{reviewId} одобрен.";
+        await LoadReviews();
+    }
+
+    private async Task RejectReview(int reviewId)
+    {
+        await using var context = await DbContextFactory.CreateDbContextAsync();
+
+        var review = await context.Reviews.FirstOrDefaultAsync(x => x.Id == reviewId);
+        if (review is null)
+            return;
+
+        review.ModerationStatus = ReviewModerationStatus.Rejected;
+        review.ModeratedAt = DateTime.UtcNow;
+
+        await context.SaveChangesAsync();
+        message = $"Отзыв #{reviewId} отклонён.";
+        await LoadReviews();
+    }
+}

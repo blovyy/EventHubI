@@ -1,0 +1,19 @@
+﻿@page "/test"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+
+<h1>Тестовая страница</h1>
+
+<button class="btn btn-primary" @onclick="TestClick">Нажми меня</button>
+
+<p>@message</p>
+
+@code {
+    private string message = "Кнопка не нажата";
+
+    private void TestClick()
+    {
+        message = "Кнопка нажата! " + DateTime.Now.ToString("HH:mm:ss");
+        Console.WriteLine("✅ Кнопка работает!");
+    }
+}

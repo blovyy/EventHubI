@@ -1,0 +1,129 @@
+﻿@page "/profile/created"
+@using EventHub.Data.Models
+@using EventHub.Services.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+
+@inject IEventService EventService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="profile-created-container">
+    <div class="page-header">
+        <button class="back-button" @onclick="GoBack">← Назад к профилю</button>
+        <h1 class="page-title">📋 Мои созданные мероприятия</h1>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="info-box">@message</div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">
+            <p>Загрузка мероприятий...</p>
+        </div>
+    }
+    else if (createdEvents == null || !createdEvents.Any())
+    {
+        <div class="empty-state">
+            <p>📭 У вас пока нет созданных мероприятий</p>
+            <button class="btn-primary" @onclick="GoToCreate">➕ Создать мероприятие</button>
+        </div>
+    }
+    else
+    {
+        <div class="events-grid">
+            @foreach (var ev in createdEvents)
+            {
+                <div class="event-card" @onclick="() => GoToEvent(ev.Id)">
+                    <div class="event-header">
+                        <h3 class="event-title">@ev.Title</h3>
+                        <span class="event-status">@GetStatusText(ev.Status)</span>
+                    </div>
+
+                    <div class="event-body">
+                        <p class="event-description">@ev.Description</p>
+                        <div class="event-details">
+                            <span>📅 @ev.StartDate.ToString("dd.MM.yyyy HH:mm")</span>
+                            <span>📍 @ev.Location</span>
+                            <span>👥 @(ev.Participants?.Count ?? 0)/@ev.MaxParticipants</span>
+                            <span>💰 @(ev.Price > 0 ? $"{ev.Price} ₽" : "Бесплатно")</span>
+                            <span>🛡️ @GetModerationText(ev.ModerationStatus)</span>
+                        </div>
+                    </div>
+
+                    <div class="event-footer">
+                        <button class="btn-edit" @onclick="() => EditEvent(ev.Id)" @onclick:stopPropagation="true">✏️ Редактировать</button>
+                        <button class="btn-delete" @onclick="() => DeleteEvent(ev.Id)" @onclick:stopPropagation="true">🗑️ Удалить</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Event>? createdEvents;
+    private bool isLoading = true;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                createdEvents = await EventService.GetEventsByOrganizerAsync(userId);
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetStatusText(EventStatus status) => status switch
+    {
+        EventStatus.Draft => "Черновик",
+        EventStatus.Published => "Опубликовано",
+        EventStatus.Cancelled => "Отменено",
+        EventStatus.Completed => "Завершено",
+        _ => status.ToString()
+    };
+
+    private string GetModerationText(EventModerationStatus status) => status switch
+    {
+        EventModerationStatus.Pending => "На модерации",
+        EventModerationStatus.Approved => "Одобрено",
+        EventModerationStatus.Rejected => "Отклонено",
+        _ => status.ToString()
+    };
+
+    private void GoBack() => NavigationManager.NavigateTo("/profile");
+    private void GoToCreate() => NavigationManager.NavigateTo("/create");
+    private void GoToEvent(int id) => NavigationManager.NavigateTo($"/event/{id}");
+    private void EditEvent(int id) => NavigationManager.NavigateTo($"/edit/{id}");
+
+    private async Task DeleteEvent(int id)
+    {
+        var result = await EventService.DeleteEventAsync(id);
+        if (result)
+        {
+            message = "Мероприятие удалено.";
+            await LoadData();
+        }
+    }
+}

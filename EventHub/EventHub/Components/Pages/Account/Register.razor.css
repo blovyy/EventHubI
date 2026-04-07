@@ -1,0 +1,143 @@
+﻿.login-container,
+.register-container {
+    max-width: 560px;
+    margin: 2.5rem auto;
+    padding: 0 20px;
+    animation: pageFadeIn 0.7s ease;
+}
+
+.login-header,
+.register-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+    .login-header h1,
+    .register-header h1 {
+        color: var(--primary-dark);
+        font-size: 2.3rem;
+        margin-bottom: 0.5rem;
+        line-height: 1.15;
+    }
+
+    .login-header p,
+    .register-header p {
+        color: var(--text-muted);
+        font-size: 1rem;
+        max-width: 480px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+
+.login-card,
+.register-card {
+    background: white;
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 14px 34px rgba(143, 182, 255, 0.12);
+    border: 1px solid var(--border);
+    animation: fadeUp 0.65s ease;
+}
+
+    .login-card h2,
+    .register-card h2 {
+        color: var(--primary-dark);
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+.checkbox-group {
+    margin: 1rem 0 1.4rem;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+    .checkbox-label input {
+        width: auto;
+        margin: 0;
+        accent-color: var(--primary-dark);
+    }
+
+.login-button,
+.register-button {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    color: white;
+    border: none;
+    border-radius: 999px;
+    font-size: 1.02rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 24px rgba(143, 182, 255, 0.28);
+    margin: 0.5rem 0 1.2rem;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .login-button:hover,
+    .register-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(143, 182, 255, 0.34);
+        color: white;
+    }
+
+    .login-button:disabled,
+    .register-button:disabled {
+        background: #cbd5e1;
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+.login-links,
+.auth-links {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.register-link {
+    color: var(--text-muted);
+    font-size: 0.96rem;
+    line-height: 1.6;
+}
+
+@keyframes pageFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .login-container,
+    .register-container {
+        margin: 1.8rem auto;
+        padding: 0 14px;
+    }
+
+    .login-header h1,
+    .register-header h1 {
+        font-size: 2rem;
+    }
+
+    .login-card,
+    .register-card {
+        padding: 1.4rem;
+        border-radius: 18px;
+    }
+}

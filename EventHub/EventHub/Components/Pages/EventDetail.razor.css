@@ -1,0 +1,290 @@
+﻿/* ===== ОСНОВНОЙ КОНТЕЙНЕР ===== */
+.event-details-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 20px;
+}
+
+h3 {
+    color: #5f8fd9;
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+}
+
+/* ===== ЗАГРУЗЧИК ===== */
+.loading-spinner {
+    text-align: center;
+    padding: 3rem;
+    color: #64748b;
+    font-size: 1.1rem;
+}
+
+/* ===== СООБЩЕНИЕ ОБ ОШИБКЕ ===== */
+.error-message {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 5px 20px rgba(143, 182, 255, 0.1);
+    color: #d32f2f;
+}
+
+/* ===== ОСНОВНАЯ КАРТОЧКА ===== */
+.details-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(143, 182, 255, 0.1);
+    border: 1px solid #d4e0f0;
+}
+
+/* ===== ШАПКА С ИНФОРМАЦИЕЙ ===== */
+.info-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #d4e0f0;
+}
+
+.info-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #5f8fd9, #8fb6ff);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.info-title h4 {
+    margin: 0 0 0.3rem 0;
+    color: #2c3e50;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.info-title p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+/* ===== СЕТКА ДЛЯ ДВУХ КОЛОНОК ===== */
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* ===== СЕКЦИИ (ОРГАНИЗАТОР И ИНФОРМАЦИЯ) ===== */
+.details-section {
+    background: #f8f9fc;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid #d4e0f0;
+}
+
+.section-title {
+    color: #5f8fd9;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px dashed #d4e0f0;
+}
+
+/* ===== ПОЛЯ С ДАННЫМИ ===== */
+.detail-item {
+    margin-bottom: 1rem;
+}
+
+.detail-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.detail-item.half {
+    flex: 1;
+}
+
+.detail-label {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.detail-value {
+    padding: 0.6rem 0.8rem;
+    background: white;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    word-break: break-word;
+    border: 1px solid #d4e0f0;
+    line-height: 1.4;
+}
+
+    .detail-value.description {
+        min-height: 80px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+
+/* ===== СЕКЦИЯ УЧАСТНИКОВ ===== */
+.participants-section {
+    background: #f8f9fc;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid #d4e0f0;
+}
+
+.participants-table {
+    overflow-x: auto;
+}
+
+    .participants-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .participants-table th {
+        text-align: left;
+        padding: 1rem 0.5rem;
+        color: #5f8fd9;
+        font-weight: 600;
+        border-bottom: 2px solid #d4e0f0;
+        background: transparent;
+    }
+
+    .participants-table td {
+        padding: 0.8rem 0.5rem;
+        border-bottom: 1px solid #d4e0f0;
+        color: #2c3e50;
+    }
+
+    .participants-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .participants-table tr:hover td {
+        background: white;
+        cursor: pointer;
+    }
+
+.empty-participants {
+    text-align: center;
+    padding: 2rem;
+    color: #64748b;
+    background: white;
+    border-radius: 12px;
+}
+
+/* ===== КНОПКИ НАВИГАЦИИ ===== */
+.actions-section {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 2px solid #d4e0f0;
+}
+
+.btn-back {
+    display: inline-block;
+    padding: 0.8rem 1.5rem;
+    background: white;
+    border: 2px solid #d4e0f0;
+    border-radius: 30px;
+    color: #64748b;
+    text-decoration: none;
+    transition: all 0.3s;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+    .btn-back:hover {
+        border-color: #8fb6ff;
+        color: #5f8fd9;
+        transform: translateX(-3px);
+        background: #f8f9fc;
+    }
+
+/* ===== АДАПТИВНОСТЬ ===== */
+@media (max-width: 768px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .detail-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .event-details-container {
+        padding: 0 15px;
+    }
+
+    .details-card {
+        padding: 1.5rem;
+    }
+
+    h3 {
+        font-size: 1.5rem;
+    }
+
+    .info-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .info-icon {
+        margin: 0 auto;
+    }
+
+    .participants-table th,
+    .participants-table td {
+        font-size: 0.85rem;
+        padding: 0.6rem 0.3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .event-details-container {
+        margin: 1rem auto;
+    }
+
+    .details-card {
+        padding: 1rem;
+    }
+
+    .details-section {
+        padding: 1rem;
+    }
+
+    .section-title {
+        font-size: 1rem;
+    }
+
+    .detail-value {
+        font-size: 0.9rem;
+        padding: 0.5rem;
+    }
+
+    .participants-table {
+        font-size: 0.8rem;
+    }
+
+    .btn-back {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
+    }
+}
