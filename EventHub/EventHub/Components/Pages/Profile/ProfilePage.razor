@@ -33,7 +33,7 @@
     {
         <div class="empty-state">
             <p>Ошибка загрузки профиля</p>
-            <button class="btn btn-primary" @onclick="RefreshPage">Обновить</button>
+            <button type="button" class="btn btn-primary" @onclick="RefreshPage">Обновить</button>
         </div>
     }
     else
@@ -71,7 +71,7 @@
                         <h2>Ваши данные</h2>
                     </div>
 
-                    <button class="btn btn-primary btn-large profile-edit-button" @onclick="OpenEditProfileModal">
+                    <button type="button" class="btn btn-primary btn-large profile-edit-button" @onclick="OpenEditProfileModal">
                         Редактировать профиль
                     </button>
                 </div>
@@ -152,17 +152,17 @@
         }
 
         <div class="profile-tabs">
-            <button class="tab-button @(activeTab == ProfileTab.Created ? "active" : "")"
+            <button type="button" class="tab-button @(activeTab == ProfileTab.Created ? "active" : "")"
                     @onclick="() => SetTab(ProfileTab.Created)">
                 Мои мероприятия
             </button>
 
-            <button class="tab-button @(activeTab == ProfileTab.Participated ? "active" : "")"
+            <button type="button" class="tab-button @(activeTab == ProfileTab.Participated ? "active" : "")"
                     @onclick="() => SetTab(ProfileTab.Participated)">
                 Посещённые
             </button>
 
-            <button class="tab-button @(activeTab == ProfileTab.Reviews ? "active" : "")"
+            <button type="button" class="tab-button @(activeTab == ProfileTab.Reviews ? "active" : "")"
                     @onclick="() => SetTab(ProfileTab.Reviews)">
                 Отзывы
             </button>
@@ -201,9 +201,9 @@
                                     </td>
                                     <td data-label="Действия" class="actions-cell">
                                         <div class="actions-stack">
-                                            <button class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
-                                            <button class="action-link-button" @onclick="() => EditEvent(ev.Id)">Редактировать</button>
-                                            <button class="action-delete" @onclick="() => DeleteEvent(ev.Id)">Удалить</button>
+                                            <button type="button" class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
+                                            <button type="button" class="action-link-button" @onclick="() => EditEvent(ev.Id)">Редактировать</button>
+                                            <button type="button" class="action-delete" @onclick="() => DeleteEvent(ev.Id)">Удалить</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -215,7 +215,7 @@
                 {
                     <div class="empty-state">
                         <p>У вас пока нет созданных мероприятий</p>
-                        <NavLink href="/create" class="btn btn-primary">Создать</NavLink>
+                        <a href="/create" class="btn btn-primary">Создать</a>
                     </div>
                 }
             }
@@ -261,11 +261,11 @@
                                     </td>
                                     <td data-label="Действия" class="actions-cell">
                                         <div class="actions-stack">
-                                            <button class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
+                                            <button type="button" class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
 
                                             @if (canReview)
                                             {
-                                                <button class="action-link-button feedback"
+                                                <button type="button" class="action-link-button feedback"
                                                         @onclick="() => OpenReviewModal(ev.Id, ev.Title)">
                                                     Оставить отзыв
                                                 </button>
@@ -468,7 +468,6 @@
         finally
         {
             _isLoading = false;
-            StateHasChanged();
         }
     }
 

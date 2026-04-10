@@ -155,7 +155,9 @@
                 Price = 0,
                 OrganizerId = userId,
                 CreatedAt = DateTime.UtcNow,
-                Status = EventStatus.Draft,
+
+                // Главное изменение здесь
+                Status = EventStatus.Published,
                 ModerationStatus = EventModerationStatus.Pending
             };
 

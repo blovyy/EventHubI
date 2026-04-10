@@ -2,11 +2,13 @@
 @using System.Security.Claims
 @using EventHub.Data
 @using EventHub.Data.Models
+@using EventHub.Services.Interfaces
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
 
 @rendermode InteractiveServer
 
+@inject IParticipantService ParticipantService
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -25,10 +27,10 @@
         <div class="filters-grid">
             <div class="form-group">
                 <label>Поиск по названию</label>
-                <InputText @bind-Value="searchText"
-                           @bind-Value:event="oninput"
-                           class="form-control"
-                           placeholder="Введите название..." />
+                <input @bind="searchText"
+                       @bind:event="oninput"
+                       class="form-control"
+                       placeholder="Введите название..." />
             </div>
 
             <div class="form-group">
@@ -93,7 +95,7 @@
     {
         <div class="no-courses">
             <p>По вашему запросу мероприятий не найдено</p>
-            <NavLink href="/create" class="btn btn-primary">Создать мероприятие</NavLink>
+            <a href="/create" class="btn btn-primary">Создать мероприятие</a>
         </div>
     }
     else
@@ -127,21 +129,23 @@
                     <div class="event-footer">
                         @if (isRegistered)
                         {
-                            <button class="btn-registered" @onclick:stopPropagation="true">
+                            <button type="button" class="btn-registered" @onclick:stopPropagation="true">
                                 Вы записаны
                             </button>
                         }
                         else
                         {
-                            <button class="btn-register"
+                            <button type="button"
+                                    class="btn-register"
                                     @onclick="() => RegisterToEvent(ev.Id)"
                                     @onclick:stopPropagation="true"
-                                    disabled="@isSubmitting || isFull">
+                                    disabled="@(isSubmitting || isFull)">
                                 @(isFull ? "Мест нет" : isSubmitting ? "Подождите..." : "Записаться")
                             </button>
                         }
 
-                        <button class="btn-view"
+                        <button type="button"
+                                class="btn-view"
                                 @onclick="() => GoToEvent(ev.Id)"
                                 @onclick:stopPropagation="true">
                             Подробнее
@@ -236,7 +240,10 @@
             currentUserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             events = await context.Events
-                .Where(e => e.ModerationStatus == EventModerationStatus.Approved)
+                .Where(e =>
+                    e.ModerationStatus == EventModerationStatus.Approved &&
+                    e.Status == EventStatus.Published &&
+                    e.StartDate > DateTime.Now)
                 .OrderBy(e => e.StartDate)
                 .Select(e => new EventCardModel
                 {
@@ -373,55 +380,41 @@
 
             await using var context = await DbContextFactory.CreateDbContextAsync();
 
-            var eventItem = await context.Events
+            var ev = await context.Events
                 .Include(e => e.Participants)
                 .FirstOrDefaultAsync(e => e.Id == eventId);
 
-            if (eventItem == null)
+            if (ev == null)
             {
                 errorMessage = "Мероприятие не найдено.";
                 return;
             }
 
-            if (eventItem.ModerationStatus != EventModerationStatus.Approved)
+            if (ev.ModerationStatus != EventModerationStatus.Approved)
             {
-                errorMessage = "Запись на это мероприятие недоступна.";
+                errorMessage = "Мероприятие ещё не одобрено модератором.";
                 return;
             }
 
-            var alreadyRegistered = await context.Participants
-                .AnyAsync(p => p.EventId == eventId && p.UserId == userId);
-
-            if (alreadyRegistered)
+            if (ev.Status != EventStatus.Published)
             {
-                errorMessage = "Вы уже записаны на это мероприятие.";
+                errorMessage = "Мероприятие не опубликовано.";
                 return;
             }
 
-            var participantsCount = await context.Participants
-                .CountAsync(p => p.EventId == eventId);
-
-            if (participantsCount >= eventItem.MaxParticipants)
+            if (ev.StartDate <= DateTime.Now)
             {
-                errorMessage = "Свободных мест больше нет.";
+                errorMessage = "Запись на уже начавшееся мероприятие недоступна.";
                 return;
             }
 
-            var currentUser = await context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            var success = await ParticipantService.RegisterUserToEventAsync(eventId, userId);
 
-            var participant = new Participant
+            if (!success)
             {
-                UserId = userId,
-                EventId = eventId,
-                RegisteredAt = DateTime.UtcNow,
-                IsCheckedIn = false,
-                FullName = currentUser != null ? $"{currentUser.FirstName} {currentUser.LastName}".Trim() : null,
-                Email = currentUser?.Email,
-                PhoneNumber = currentUser?.PhoneNumber
-            };
-
-            context.Participants.Add(participant);
-            await context.SaveChangesAsync();
+                errorMessage = "Не удалось записаться. Возможно, вы уже записаны или свободных мест больше нет.";
+                return;
+            }
 
             infoMessage = "Вы успешно записались на мероприятие.";
             await LoadEvents();

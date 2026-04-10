@@ -95,11 +95,31 @@ public class EventService : IEventService
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
 
-        var eventItem = await context.Events.FirstOrDefaultAsync(e => e.Id == id);
+        var eventItem = await context.Events
+            .Include(e => e.Participants)
+            .Include(e => e.Reviews)
+            .FirstOrDefaultAsync(e => e.Id == id);
+
         if (eventItem == null)
             return false;
 
+        // Сначала удаляем связанных участников
+        if (eventItem.Participants.Any())
+        {
+            context.Participants.RemoveRange(eventItem.Participants);
+        }
+
+        // Потом удаляем связанные отзывы
+        if (eventItem.Reviews.Any())
+        {
+            context.Reviews.RemoveRange(eventItem.Reviews);
+        }
+
+        
+
+        // И только потом удаляем само мероприятие
         context.Events.Remove(eventItem);
+
         await context.SaveChangesAsync();
 
         return true;
