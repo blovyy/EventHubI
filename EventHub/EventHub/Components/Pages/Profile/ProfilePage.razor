@@ -262,6 +262,7 @@
                                     <td data-label="Действия" class="actions-cell">
                                         <div class="actions-stack">
                                             <button type="button" class="action-link-button" @onclick="() => GoToEvent(ev.Id)">Просмотр</button>
+                                            <button type="button" class="action-delete" @onclick="() => UnregisterFromEvent(ev.Id)">Выписаться</button>
 
                                             @if (canReview)
                                             {
@@ -491,6 +492,29 @@
         {
             errorMessage = "Не удалось удалить мероприятие.";
         }
+    }
+
+    private async Task UnregisterFromEvent(int eventId)
+    {
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            errorMessage = "Не удалось определить пользователя.";
+            return;
+        }
+
+        errorMessage = null;
+        infoMessage = null;
+
+        var success = await ParticipantService.CancelRegistrationAsync(eventId, currentUserId);
+
+        if (!success)
+        {
+            errorMessage = "Не удалось выписаться с мероприятия.";
+            return;
+        }
+
+        infoMessage = "Вы успешно выписались с мероприятия.";
+        await LoadData();
     }
 
     private void RefreshPage()

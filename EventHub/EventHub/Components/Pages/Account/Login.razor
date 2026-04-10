@@ -49,7 +49,7 @@
 
             @if (showLoginForm)
             {
-                <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login" class="auth-form">
+                <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="loginForm" class="auth-form">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="validation-summary-errors" />
 
@@ -87,7 +87,7 @@
                             <span>Запомнить меня</span>
                         </label>
 
-                        <NavLink href="/Account/ForgotPassword" class="auth-text-link">Забыли пароль?</NavLink>
+                        <a href="/Account/ForgotPassword" class="auth-text-link">Забыли пароль?</a>
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-large auth-submit" disabled="@isProcessing">
@@ -96,7 +96,7 @@
 
                     <div class="auth-switch">
                         <span>Еще нет аккаунта?</span>
-                        <NavLink href="/Account/Register">Создать его</NavLink>
+                        <a href="/Account/Register">Создать его</a>
                     </div>
                 </EditForm>
             }
@@ -105,7 +105,7 @@
                 <div class="auth-success">
                     <h2>Вход выполнен</h2>
                     <p>Сейчас перенаправим вас на главную страницу.</p>
-                    <NavLink href="/" class="btn btn-primary btn-large auth-submit">Перейти на главную</NavLink>
+                    <a href="/" class="btn btn-primary btn-large auth-submit">Перейти на главную</a>
                 </div>
             }
         </div>
@@ -126,7 +126,8 @@
 
     private async Task LoginUser()
     {
-        if (isProcessing) return;
+        if (isProcessing)
+            return;
 
         try
         {
@@ -156,18 +157,22 @@
                 showLoginForm = false;
 
                 StateHasChanged();
-                await Task.Delay(1500);
 
-                NavigationManager.NavigateTo(ReturnUrl ?? "/");
+                await Task.Delay(800);
+
+                NavigationManager.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+                return;
             }
-            else
-            {
-                errorMessage = "Неверный email или пароль.";
-            }
+
+            errorMessage = "Неверный email или пароль.";
+        }
+        catch (Microsoft.AspNetCore.Components.NavigationException)
+        {
+            // Нормальное поведение при переходе, ошибку пользователю не показываем
         }
         catch (Exception ex)
         {
-            errorMessage = $"Ошибка при входе: {ex.Message}";
+            errorMessage = "Ошибка при входе. Попробуйте ещё раз.";
             Logger.LogError(ex, "Ошибка входа для пользователя {Email}", Input.Email);
         }
         finally

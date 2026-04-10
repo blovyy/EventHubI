@@ -80,7 +80,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Макс. участников</label>
-                        <InputNumber @bind-Value="model.MaxParticipants" class="form-control" />
+                        <InputNumber @bind-Value="model.MaxParticipants" class="form-control" min="1" />
                     </div>
                 </div>
 
@@ -143,6 +143,12 @@
                 return;
             }
 
+            if (model.MaxParticipants < 1)
+            {
+                errorMessage = "Количество участников должно быть больше 0";
+                return;
+            }
+
             var newEvent = new Event
             {
                 Title = model.Title.Trim(),
@@ -155,8 +161,6 @@
                 Price = 0,
                 OrganizerId = userId,
                 CreatedAt = DateTime.UtcNow,
-
-                // Главное изменение здесь
                 Status = EventStatus.Published,
                 ModerationStatus = EventModerationStatus.Pending
             };
@@ -206,7 +210,7 @@
         [Required(ErrorMessage = "Введите место")]
         public string Location { get; set; } = string.Empty;
 
-        [Range(1, 100000)]
+        [Range(1, 100000, ErrorMessage = "Количество участников должно быть от 1 до 100000")]
         public int MaxParticipants { get; set; }
 
         [Required]

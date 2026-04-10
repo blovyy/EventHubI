@@ -129,8 +129,12 @@
                     <div class="event-footer">
                         @if (isRegistered)
                         {
-                            <button type="button" class="btn-registered" @onclick:stopPropagation="true">
-                                Вы записаны
+                            <button type="button"
+                                    class="btn-registered"
+                                    @onclick="() => UnregisterFromEvent(ev.Id)"
+                                    @onclick:stopPropagation="true"
+                                    disabled="@isSubmitting">
+                                @(isSubmitting ? "Подождите..." : "Выписаться")
                             </button>
                         }
                         else
@@ -378,36 +382,6 @@
                 return;
             }
 
-            await using var context = await DbContextFactory.CreateDbContextAsync();
-
-            var ev = await context.Events
-                .Include(e => e.Participants)
-                .FirstOrDefaultAsync(e => e.Id == eventId);
-
-            if (ev == null)
-            {
-                errorMessage = "Мероприятие не найдено.";
-                return;
-            }
-
-            if (ev.ModerationStatus != EventModerationStatus.Approved)
-            {
-                errorMessage = "Мероприятие ещё не одобрено модератором.";
-                return;
-            }
-
-            if (ev.Status != EventStatus.Published)
-            {
-                errorMessage = "Мероприятие не опубликовано.";
-                return;
-            }
-
-            if (ev.StartDate <= DateTime.Now)
-            {
-                errorMessage = "Запись на уже начавшееся мероприятие недоступна.";
-                return;
-            }
-
             var success = await ParticipantService.RegisterUserToEventAsync(eventId, userId);
 
             if (!success)
@@ -422,6 +396,48 @@
         catch (Exception ex)
         {
             errorMessage = $"Не удалось записаться на мероприятие: {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task UnregisterFromEvent(int eventId)
+    {
+        if (isSubmitting)
+            return;
+
+        infoMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            isSubmitting = true;
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Не удалось определить пользователя.";
+                return;
+            }
+
+            var success = await ParticipantService.CancelRegistrationAsync(eventId, userId);
+
+            if (!success)
+            {
+                errorMessage = "Не удалось выписаться с мероприятия.";
+                return;
+            }
+
+            infoMessage = "Вы успешно выписались с мероприятия.";
+            await LoadEvents();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Ошибка при отмене записи: {ex.Message}";
         }
         finally
         {
